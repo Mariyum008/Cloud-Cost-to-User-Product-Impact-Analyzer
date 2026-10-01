@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cloud cost to impact - Contoso Retail India</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&display=swap" rel="stylesheet">
+<style>
+/* Tokens: blue = cost, amber = business activity, green = utilization, crimson = waste */
+:root {
+  --paper: #F1F4F2; --panel: #FFFFFF; --ink: #14232E; --ink-2: #4D5D66; --ink-3: #7A8A91;
+  --rule: #CDD5D3; --cost: #1F5F8B; --cost-soft: rgba(31, 95, 139, .14);
+  --activity: #B26F12; --cpu: #3F7A52; --waste: #B3264C; --waste-soft: rgba(179, 38, 76, .16);
+  --band: rgba(77, 93, 102, .13); --focus: #1F5F8B;
+  --font: "Archivo", "Helvetica Neue", Arial, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0F171C; --panel: #152129; --ink: #E4EBE9; --ink-2: #A3B2B7; --ink-3: #7C8C92;
+    --rule: #2B3B43; --cost: #74AEDB; --cost-soft: rgba(116, 174, 219, .16);
+    --activity: #E3A549; --cpu: #82BE93; --waste: #EA7193; --waste-soft: rgba(234, 113, 147, .18);
+    --band: rgba(163, 178, 183, .14); --focus: #74AEDB;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0F171C; --panel: #152129; --ink: #E4EBE9; --ink-2: #A3B2B7; --ink-3: #7C8C92;
+  --rule: #2B3B43; --cost: #74AEDB; --cost-soft: rgba(116, 174, 219, .16);
+  --activity: #E3A549; --cpu: #82BE93; --waste: #EA7193; --waste-soft: rgba(234, 113, 147, .18);
+  --band: rgba(163, 178, 183, .14); --focus: #74AEDB;
+}
+:root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font);
+  font-size: 15px; line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+
+/* Top bar */
+header.top { border-bottom: 1px solid var(--rule); background: var(--paper); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.top .wrap { display: flex; align-items: center; gap: 28px; min-height: 60px; flex-wrap: wrap; }
+.brand { font-stretch: 75%; font-weight: 650; font-size: 18px; letter-spacing: -.01em; white-space: nowrap; }
+.brand small { font-weight: 400; color: var(--ink-3); font-stretch: 100%; font-size: 13px; margin-left: 8px; }
+nav.tabs { display: flex; gap: 4px; flex: 1; overflow-x: auto; }
+nav.tabs button {
+  font: inherit; font-size: 14px; color: var(--ink-2); background: none; border: 0; cursor: pointer;
+  padding: 18px 10px 16px; border-bottom: 3px solid transparent; white-space: nowrap;
+}
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--cost); font-weight: 600; }
+.month-pick { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+select {
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 4px; padding: 6px 8px;
+}
+
+/* Page structure */
+main { padding: 36px 0 64px; }
+.page[hidden] { display: none; }
+h1.lede {
+  font-stretch: 72%; font-weight: 620; font-size: clamp(30px, 4.6vw, 52px); line-height: 1.04;
+  letter-spacing: -.015em; margin: 0 0 10px; max-width: 26ch;
+}
+p.sub { color: var(--ink-2); margin: 0 0 30px; max-width: 70ch; }
+h2 { font-stretch: 85%; font-weight: 620; font-size: 19px; margin: 0 0 4px; letter-spacing: -.005em; }
+.note { color: var(--ink-3); font-size: 13px; margin: 0 0 14px; max-width: 75ch; }
+section.block { padding: 26px 0; border-top: 1px solid var(--rule); }
+.grid { display: grid; gap: 40px; }
+.g-2-1 { grid-template-columns: 2fr 1fr; }
+.g-1-1 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 900px) { .g-2-1, .g-1-1 { grid-template-columns: 1fr; } }
+.chart { position: relative; height: 320px; }
+.chart.tall { height: 380px; }
+.chart.short { height: 220px; }
+
+/* Meter readout: the month's figures as one strip */
+.readout { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); margin-bottom: 8px; }
+.readout div { padding: 14px 16px 16px; border-left: 1px solid var(--rule); }
+.readout div:first-child { border-left: 0; padding-left: 0; }
+.readout dt { font-size: 13px; color: var(--ink-2); }
+.readout dd { margin: 2px 0 0; font-stretch: 80%; font-weight: 600; font-size: 28px; line-height: 1.15; }
+.readout .delta { display: block; font-size: 13px; font-weight: 400; font-stretch: 100%; color: var(--ink-3); }
+.up-bad { color: var(--waste) !important; }
+.down-good { color: var(--cpu) !important; }
+@media (max-width: 1000px) { .readout { grid-template-columns: repeat(3, 1fr); } .readout div:nth-child(4) { border-left: 0; padding-left: 0; } }
+@media (max-width: 560px) { .readout { grid-template-columns: repeat(2, 1fr); } .readout div { border-left: 0; padding-left: 0; } }
+
+/* Segmented control */
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; margin: 6px 0 12px; }
+.seg button { font: inherit; font-size: 13px; background: var(--panel); color: var(--ink-2); border: 0; padding: 6px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; }
+.legend i.dash { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); height: 2px; }
+.legend i.box { height: 10px; }
+.types { padding-top: 4px; }
+.type-row { margin-bottom: 16px; }
+.type-label { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; margin-bottom: 5px; }
+.type-label small { color: var(--ink-3); font-size: 12px; margin-left: 4px; }
+.type-track { height: 10px; background: var(--rule); border-radius: 1px; }
+.type-track span { display: block; height: 100%; background: var(--cost); border-radius: 1px; }
+.type-track span.w { background: var(--waste); }
+.caption { font-size: 14px; color: var(--ink-2); margin-top: 10px; max-width: 70ch; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: right; font-weight: 500; color: var(--ink-2); padding: 8px 10px; border-bottom: 1px solid var(--ink); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; padding-left: 0; }
+th button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+th[aria-sort] button { color: var(--ink); font-weight: 600; }
+td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td.wrap-text { white-space: normal; text-align: left; min-width: 220px; color: var(--ink-2); }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: var(--cost-soft); }
+tbody tr[aria-selected="true"] { background: var(--cost-soft); box-shadow: inset 3px 0 0 var(--cost); }
+tbody tr[aria-selected="true"] td:first-child { padding-left: 8px; }
+.tag { font-size: 12px; color: var(--ink-3); display: block; }
+.verdict-waste { color: var(--waste); font-weight: 600; }
+.verdict-ok { color: var(--cpu); font-weight: 600; }
+.bar-cell { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.bar-cell span.bar { display: inline-block; height: 8px; background: var(--cpu); border-radius: 1px; }
+
+.detail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.big-number { font-stretch: 72%; font-weight: 620; font-size: clamp(40px, 6vw, 68px); line-height: 1; letter-spacing: -.02em; }
+.controls { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.controls label { font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; align-items: center; }
+.btn-link { font: inherit; font-size: 13px; color: var(--cost); background: none; border: 0; cursor: pointer; text-decoration: underline; padding: 0; }
+.score { display: flex; gap: 36px; flex-wrap: wrap; margin: 4px 0 18px; }
+.score div { font-size: 14px; color: var(--ink-2); max-width: 30ch; }
+.score strong { display: block; font-stretch: 78%; font-size: 30px; color: var(--ink); font-weight: 620; line-height: 1.1; }
+footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--ink-3); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">Cloud cost to impact<small>Contoso Retail India</small></div>
+    <nav class="tabs" role="tablist" aria-label="Dashboard pages">
+      <button role="tab" data-page="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-page="serve" aria-selected="false">Cost to serve</button>
+      <button role="tab" data-page="anomalies" aria-selected="false">Anomalies</button>
+      <button role="tab" data-page="savings" aria-selected="false">Savings</button>
+    </nav>
+    <label class="month-pick" id="month-pick">Month <select id="month"></select></label>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- Overview -->
+  <div class="page" id="page-overview" role="tabpanel">
+    <h1 class="lede" id="ov-lede"></h1>
+    <p class="sub">Azure spend for 5,000 employees and four customer-facing products, traced from the bill to the people and transactions behind it.</p>
+    <dl class="readout" id="ov-readout"></dl>
+
+    <section class="block grid g-2-1">
+      <div>
+        <h2>Is cost keeping pace with the business?</h2>
+        <p class="note">100 = each line's average over the first 12 months. Shading turns red where cost runs ahead of the activity it serves.</p>
+        <div class="seg" role="group" aria-label="Compare cost with">
+          <button data-cmp="orders" aria-pressed="true">Orders</button>
+          <button data-cmp="employees" aria-pressed="false">Active employees</button>
+        </div>
+        <div class="legend"><span><i style="background:var(--cost)"></i>Cloud cost</span><span><i style="background:var(--activity)" id="ov-cmp-key"></i><span id="ov-cmp-name">Orders</span></span></div>
+        <div class="chart tall"><canvas id="ov-index"></canvas></div>
+        <p class="caption" id="ov-index-caption"></p>
+      </div>
+      <div>
+        <h2>Where the money went</h2>
+        <p class="note">Every dollar of the selected month, by how it was attributed.</p>
+        <div id="ov-types" class="types"></div>
+      </div>
+    </section>
+
+    <section class="block grid g-1-1">
+      <div>
+        <h2>Spend by service category</h2>
+        <p class="note">Monthly effective cost from the FOCUS bill.</p>
+        <div class="chart"><canvas id="ov-services"></canvas></div>
+      </div>
+      <div>
+        <h2>Cost per employee, by team</h2>
+        <p class="note">Selected month. Employees' own app usage divided by team headcount; apps a team owns are excluded.</p>
+        <div class="chart"><canvas id="ov-teams"></canvas></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Cost to serve -->
+  <div class="page" id="page-serve" role="tabpanel" hidden>
+    <h1 class="lede" id="sv-lede">What each app costs to run</h1>
+    <p class="sub">Select an app to see its monthly cost, its unit cost, and how unevenly that cost is spread across the people who use it.</p>
+    <div class="table-wrap"><table id="sv-table"></table></div>
+
+    <section class="block" id="sv-detail">
+      <div class="detail-head">
+        <div><h2 id="sv-app-name"></h2><p class="note" id="sv-app-desc"></p></div>
+        <div style="text-align:right"><div class="big-number" id="sv-unit"></div><div class="note" id="sv-unit-label"></div></div>
+      </div>
+      <div class="grid g-1-1">
+        <div>
+          <div class="legend"><span><i class="box" style="background:var(--cost)"></i>Monthly cost</span><span><i style="background:var(--activity)"></i><span id="sv-unit-key"></span></span></div>
+          <div class="chart"><canvas id="sv-trend"></canvas></div>
+        </div>
+        <div>
+          <div class="legend" id="sv-spread-legend"><span><i class="box" style="background:var(--cost-soft)"></i>Middle 80% of users</span><span><i style="background:var(--cost)"></i>Median user</span><span><i class="dash" style="color:var(--waste)"></i>Naive average</span></div>
+          <div class="chart"><canvas id="sv-spread"></canvas></div>
+          <p class="caption" id="sv-spread-caption"></p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Anomalies -->
+  <div class="page" id="page-anomalies" role="tabpanel" hidden>
+    <h1 class="lede">Days when cost moved and the business didn't</h1>
+    <p class="sub">Each app's daily cost is compared with its own recent past. Days well above the usual range are flagged, then checked against activity and CPU to tell waste from real growth.</p>
+    <div class="score" id="an-score"></div>
+
+    <section class="block">
+      <div class="controls">
+        <label>App <select id="an-app"></select></label>
+        <button class="btn-link" id="an-full" type="button">Show full two years</button>
+      </div>
+      <div class="legend"><span><i style="background:var(--cost)"></i>Daily cost</span><span><i class="box" style="background:var(--band)"></i>Usual range (same weekday, previous 6 weeks)</span><span><i class="box" style="background:var(--waste)"></i>Flagged day</span></div>
+      <div class="chart tall"><canvas id="an-cost"></canvas></div>
+      <div class="legend" style="margin-top:14px"><span><i style="background:var(--activity)"></i>Activity vs usual (100 = normal)</span><span><i style="background:var(--cpu)"></i>Average CPU %</span></div>
+      <div class="chart short"><canvas id="an-signals"></canvas></div>
+    </section>
+
+    <section class="block">
+      <h2>Planted events</h2>
+      <p class="note">The answer key built into the synthetic data. Changes compare each event's first four weeks with the four weeks before it. Select a row to zoom the chart.</p>
+      <div class="table-wrap"><table id="an-events"></table></div>
+    </section>
+  </div>
+
+  <!-- Savings -->
+  <div class="page" id="page-savings" role="tabpanel" hidden>
+    <h1 class="lede" id="sa-lede"></h1>
+    <p class="sub">Rule-based checks on the latest month: resources nobody uses, capacity bought but idle, and steady workloads paying full price.</p>
+    <div class="table-wrap"><table id="sa-table"></table></div>
+
+    <section class="block grid g-1-1" style="margin-top:28px">
+      <div>
+        <h2>Waste over time</h2>
+        <p class="note">Cost that served nobody: idle hosts, orphaned resources, unused reservation hours.</p>
+        <div class="legend"><span><i class="box" style="background:var(--waste)"></i>Idle capacity</span><span><i class="box" style="background:var(--activity)"></i>Orphaned resources</span><span><i class="box" style="background:var(--ink-3)"></i>Unused reservations</span></div>
+        <div class="chart"><canvas id="sa-waste"></canvas></div>
+      </div>
+      <div>
+        <h2>Reservation utilization</h2>
+        <p class="note">Share of reserved hours actually used each month.</p>
+        <div class="legend" id="sa-ri-legend"></div>
+        <div class="chart"><canvas id="sa-ri"></canvas></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer><div class="wrap" id="foot"></div></footer>
+
+<script>/*__CHARTJS__*/</script>
+<script>
+const D = /*__DATA__*/null;
+
+// ---------- helpers ----------
+const rows = ds => { const k = Object.keys(ds), n = ds[k[0]].length; return Array.from({ length: n }, (_, i) => Object.fromEntries(k.map(c => [c, ds[c][i]]))); };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const money = v => v == null ? "-" : Math.abs(v) >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e4 ? `$${(v / 1e3).toFixed(1)}K` : `$${v.toLocaleString("en-US", { maximumFractionDigits: v < 100 ? 2 : 0, minimumFractionDigits: v < 100 ? 2 : 0 })}`;
+const num = v => v == null ? "-" : Math.round(v).toLocaleString("en-US");
+const pct = (v, d = 1) => v == null ? "-" : `${v > 0 ? "+" : ""}${v.toFixed(d)}%`;
+const toDate = s => { const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const monthName = (s, opts = { month: "long", year: "numeric" }) => toDate(s).toLocaleString("en-US", { ...opts, timeZone: "UTC" });
+const shortMonth = s => monthName(s, { month: "short", year: "2-digit" });
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const KPI = rows(D.kpi), APPS = rows(D.apps), APPM = rows(D.app_monthly), TEAMS = rows(D.team_monthly);
+const SERV = rows(D.service_monthly), TYPES = rows(D.cost_type_monthly), SPREAD = rows(D.user_spread);
+const EVENTS = rows(D.events), WASTE = rows(D.waste_monthly), RES = rows(D.reservation_monthly), FIND = rows(D.findings);
+const MONTHS = KPI.map(r => r.month);
+const appName = Object.fromEntries(APPS.map(a => [a.app_id, a.app_name]));
+const appInfo = Object.fromEntries(APPS.map(a => [a.app_id, a]));
+const SESSION_APPS = new Set(SPREAD.map(r => r.app_id));
+const state = { month: MONTHS[MONTHS.length - 1], page: "overview", cmp: "orders", app: "A02", anApp: "A02", range: null, sort: { key: "total_cost", dir: -1 } };
+const charts = {};
+
+// Vertical dashed marker for the selected month or event window
+Chart.register({
+  id: "marker",
+  afterDatasetsDraw(chart, _a, o) {
+    if (o.index == null) return;
+    const { ctx, chartArea: { top, bottom } } = chart, x = chart.scales.x.getPixelForValue(o.index);
+    ctx.save(); ctx.strokeStyle = o.color; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
+  }
+});
+
+function draw(id, config) {
+  // Replace a chart, applying theme colors and shared defaults
+  charts[id]?.destroy();
+  const grid = css("--rule"), ink = css("--ink-2");
+  Chart.defaults.font.family = css("--font"); Chart.defaults.font.size = 12; Chart.defaults.color = ink;
+  config.options = Object.assign({ responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false } }, config.options || {});
+  config.options.plugins = Object.assign({ legend: { display: false } }, config.options.plugins || {});
+  for (const s of Object.values(config.options.scales || {})) {
+    s.grid = Object.assign({ color: grid, drawTicks: false }, s.grid || {});
+    s.border = { display: false };
+    s.ticks = Object.assign({ padding: 6 }, s.ticks || {});
+  }
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+// ---------- overview ----------
+function renderOverview() {
+  const i = MONTHS.indexOf(state.month), k = KPI[i], p = KPI[i - 1];
+  const prevName = p ? monthName(p.month, { month: "long" }) : null;
+  document.getElementById("ov-lede").textContent = p
+    ? `${monthName(k.month)} cloud cost was ${money(k.total_cost)}, ${Math.abs(k.total_cost_mom_pct).toFixed(1)}% ${k.total_cost_mom_pct >= 0 ? "more" : "less"} than ${prevName}.`
+    : `${monthName(k.month)} cloud cost was ${money(k.total_cost)}.`;
+
+  const delta = (cur, prev, lowerIsBetter = true) => {
+    if (prev == null || cur == null) return `<span class="delta">first month</span>`;
+    const d = 100 * (cur / prev - 1), cls = Math.abs(d) < 0.5 ? "" : (d > 0) === lowerIsBetter ? "up-bad" : "down-good";
+    return `<span class="delta ${cls}">${pct(d)} vs ${p ? shortMonth(p.month) : ""}</span>`;
+  };
+  const waste = k.idle_cost + k.orphaned_cost + k.unused_reservation_cost;
+  const items = [
+    ["Cloud cost", money(k.total_cost), delta(k.total_cost, p?.total_cost)],
+    ["Per active employee", money(k.cost_per_active_employee), delta(k.cost_per_active_employee, p?.cost_per_active_employee)],
+    ["Per 1,000 orders", money(k.cost_per_order * 1000), delta(k.cost_per_order, p?.cost_per_order)],
+    ["Customer apps vs revenue", `${k.customer_infra_pct_of_revenue.toFixed(2)}%`, delta(k.customer_infra_pct_of_revenue, p?.customer_infra_pct_of_revenue)],
+    ["Idle and unallocated", money(waste), `<span class="delta">${k.idle_unallocated_pct.toFixed(1)}% of cost</span>`],
+    ["Saved vs list price", money(k.savings_vs_list), `<span class="delta">EA discount and reservations</span>`],
+  ];
+  document.getElementById("ov-readout").innerHTML = items.map(([l, v, d]) => `<div><dt>${l}</dt><dd>${v}${d}</dd></div>`).join("");
+
+  // Indexed cost vs the chosen business driver, shaded by divergence
+  // Index both lines to their first-year average, so one festive month can't distort the baseline
+  const cmpKey = state.cmp === "orders" ? "orders" : "active_employees";
+  const avg = (key, a, b) => KPI.slice(a, b).reduce((t, r) => t + r[key], 0) / (b - a);
+  const costIdx = KPI.map(r => 100 * r.total_cost / avg("total_cost", 0, 12));
+  const cmpIdx = KPI.map(r => 100 * r[cmpKey] / avg(cmpKey, 0, 12));
+  document.getElementById("ov-cmp-name").textContent = state.cmp === "orders" ? "Orders" : "Active employees";
+  draw("ov-index", {
+    type: "line",
+    data: { labels: MONTHS.map(shortMonth), datasets: [
+      { label: "Cloud cost", data: costIdx, borderColor: css("--cost"), borderWidth: 2.5, pointRadius: 0, tension: .25,
+        fill: { target: 1, above: css("--waste-soft"), below: css("--cost-soft") } },
+      { label: state.cmp === "orders" ? "Orders" : "Active employees", data: cmpIdx, borderColor: css("--activity"), borderWidth: 2, pointRadius: 0, tension: .25 },
+    ] },
+    options: { scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => v } } },
+      plugins: { marker: { index: i, color: css("--ink-3") },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(0)}` } } } }
+  });
+  const verb = v => `${v >= 0 ? "grew" : "fell"} ${Math.abs(v).toFixed(0)}%`;
+  const yoy = key => 100 * (avg(key, 12, 24) / avg(key, 0, 12) - 1);
+  document.getElementById("ov-index-caption").textContent =
+    `Year over year (Oct 2025 to Sep 2026 vs the 12 months before), cloud cost ${verb(yoy("total_cost"))} while ${state.cmp === "orders" ? "orders" : "average active employees"} ${verb(yoy(cmpKey))}.`;
+
+  // Attribution of the selected month
+  const typeLabels = { user_activity: "Used by employees", owned_app: "Apps without employee logins", idle_capacity: "Idle capacity", orphaned: "Orphaned resources", unused_reservation: "Unused reservations" };
+  const tm = TYPES.filter(r => r.month === state.month).sort((a, b) => b.cost - a.cost);
+  const tot = tm.reduce((t, r) => t + r.cost, 0);
+  document.getElementById("ov-types").innerHTML = tm.map(r => {
+    const waste = ["idle_capacity", "orphaned", "unused_reservation"].includes(r.cost_type);
+    return `<div class="type-row"><div class="type-label"><span>${typeLabels[r.cost_type]}</span><span>${money(r.cost)} <small>${(100 * r.cost / tot).toFixed(1)}%</small></span></div>
+      <div class="type-track"><span class="${waste ? "w" : ""}" style="width:${Math.max(0.6, 100 * r.cost / tot)}%"></span></div></div>`;
+  }).join("") + `<p class="note" style="margin-top:14px">Used by employees: split by session time and CPU. Apps without logins: customer-facing apps, ETL and dev environments, charged to their owner team. Red: cost that served nobody.</p>`;
+
+  // Spend by service category, stacked by month
+  const cats = [...new Set(SERV.map(r => r.category))];
+  const ramp = [css("--cost"), css("--activity"), css("--cpu"), css("--ink-2"), css("--waste"), css("--ink-3"), "#8AA6B8", "#C9B37E", "#9DB9A4"];
+  draw("ov-services", {
+    type: "bar",
+    data: { labels: MONTHS.map(shortMonth), datasets: cats.map((c, j) => ({ label: c, data: MONTHS.map(m => SERV.find(r => r.month === m && r.category === c)?.cost ?? 0),
+      backgroundColor: ramp[j % ramp.length], stack: "s" })) },
+    options: { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ticks: { callback: v => money(v) } } },
+      plugins: { legend: { display: true, position: "bottom", labels: { boxWidth: 10, boxHeight: 10 } },
+        marker: { index: i, color: css("--ink") }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
+  });
+
+  // Cost per head by team
+  const tt = TEAMS.filter(r => r.month === state.month && r.team !== "Unallocated" && r.user_cost_per_head != null).sort((a, b) => b.user_cost_per_head - a.user_cost_per_head);
+  draw("ov-teams", {
+    type: "bar",
+    data: { labels: tt.map(r => r.team), datasets: [{ data: tt.map(r => r.user_cost_per_head), backgroundColor: css("--cost"), borderRadius: 2 }] },
+    options: { indexAxis: "y", scales: { x: { ticks: { callback: v => money(v) } }, y: { grid: { display: false } } },
+      plugins: { tooltip: { callbacks: { label: c => `${money(c.parsed.x)} per employee` } } } }
+  });
+}
+
+// ---------- cost to serve ----------
+function renderServe() {
+  const m = APPM.filter(r => r.month === state.month);
+  document.getElementById("sv-lede").textContent = `What each app cost to run in ${monthName(state.month)}`;
+  const cols = [
+    ["app_id", "App"], ["total_cost", "Cost"], ["cost_mom_pct", "vs last month"], ["active_users", "Active users"],
+    ["cost_per_active_user", "Per user"], ["transactions", "Transactions"], ["cost_per_1k_transactions", "Per 1,000"], ["idle_pct", "Idle"]];
+  const { key, dir } = state.sort;
+  m.sort((a, b) => key === "app_id" ? dir * appName[a.app_id].localeCompare(appName[b.app_id]) : dir * ((a[key] ?? -Infinity) - (b[key] ?? -Infinity)));
+  const head = cols.map(([k, l]) => `<th ${k === key ? `aria-sort="${dir > 0 ? "ascending" : "descending"}"` : ""}><button data-sort="${k}">${l}</button></th>`).join("");
+  const body = m.map(r => `<tr class="clickable" tabindex="0" data-app="${r.app_id}" aria-selected="${r.app_id === state.app}">
+      <td>${esc(appName[r.app_id])}<span class="tag">${esc(appInfo[r.app_id].owner_team)}</span></td>
+      <td>${money(r.total_cost)}</td>
+      <td class="${r.cost_mom_pct > 5 ? "up-bad" : ""}">${pct(r.cost_mom_pct)}</td>
+      <td>${num(r.active_users)}</td><td>${money(r.cost_per_active_user)}</td>
+      <td>${r.transactions ? num(r.transactions) : "-"}</td><td>${r.cost_per_1k_transactions == null ? "-" : money(r.cost_per_1k_transactions)}</td>
+      <td class="${r.idle_pct >= 5 ? "up-bad" : ""}">${r.idle_pct ? r.idle_pct.toFixed(1) + "%" : "-"}</td></tr>`).join("");
+  document.getElementById("sv-table").innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
+  renderAppDetail();
+}
+
+function renderAppDetail() {
+  const id = state.app, info = appInfo[id], series = APPM.filter(r => r.app_id === id);
+  const perUser = SESSION_APPS.has(id), i = MONTHS.indexOf(state.month), cur = series.find(r => r.month === state.month);
+  const unitKey = perUser ? "cost_per_active_user" : "cost_per_1k_transactions";
+  const unitLabel = perUser ? "Cost per active user" : id === "A16" ? "Cost per 1,000 pipeline runs" : "Cost per 1,000 transactions";
+  const kindText = { avd: "Virtual desktops", internal_web: "Internal web app", customer: "Customer-facing app", data: "Data platform", ml: "Machine learning platform", devtest: "Developer environments", platform: "Shared platform" }[info.app_kind];
+  document.getElementById("sv-app-name").textContent = info.app_name;
+  document.getElementById("sv-app-desc").textContent = `${kindText}, owned by ${info.owner_team}. ${perUser ? "Cost is split across users by how long and how heavily they used it." : "No employee logins, so cost is measured per unit of work instead of per person."}`;
+  const hasUnit = cur && cur[unitKey] != null;
+  document.getElementById("sv-unit").textContent = hasUnit ? money(cur[unitKey]) : money(cur?.total_cost);
+  document.getElementById("sv-unit-label").textContent = hasUnit ? `${unitLabel.toLowerCase()}, ${monthName(state.month)}` : `total cost, ${monthName(state.month)}`;
+  document.getElementById("sv-unit-key").textContent = hasUnit ? unitLabel : "No unit measure";
+
+  draw("sv-trend", {
+    type: "bar",
+    data: { labels: series.map(r => shortMonth(r.month)), datasets: [
+      { type: "bar", label: "Monthly cost", data: series.map(r => r.total_cost), backgroundColor: css("--cost"), borderRadius: 1, yAxisID: "y" },
+      { type: "line", label: unitLabel, data: series.map(r => r[unitKey]), borderColor: css("--activity"), borderWidth: 2, pointRadius: 0, tension: .25, yAxisID: "y1" },
+    ] },
+    options: { scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => money(v) } },
+      y1: { position: "right", grid: { display: false }, ticks: { callback: v => money(v) } } },
+      plugins: { marker: { index: i, color: css("--ink-3") }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
+  });
+
+  // Spread of cost across users: shows what a naive average hides
+  const legend = document.getElementById("sv-spread-legend"), cap = document.getElementById("sv-spread-caption");
+  if (!perUser) {
+    legend.style.visibility = "hidden";
+    draw("sv-spread", { type: "line", data: { labels: series.map(r => shortMonth(r.month)), datasets: [
+      { label: "Cost index", data: series.map(r => 100 * r.total_cost / series[0].total_cost), borderColor: css("--cost"), borderWidth: 2, pointRadius: 0 },
+      { label: "Activity index", data: series.map(r => r.transactions ? 100 * r.transactions / series[0].transactions : null), borderColor: css("--activity"), borderWidth: 2, pointRadius: 0 }] },
+      options: { scales: { x: { grid: { display: false } }, y: {} }, plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(0)}` } } } } });
+    cap.textContent = series[0].transactions ? "Cost and activity, both indexed to 100 in October 2024." : "This app has no activity measure; its cost is shared overhead for its owner team.";
+    return;
+  }
+  legend.style.visibility = "visible";
+  const sp = SPREAD.filter(r => r.app_id === id), naive = sp.map(r => series.find(s => s.month === r.month)?.cost_per_active_user);
+  draw("sv-spread", {
+    type: "line",
+    data: { labels: sp.map(r => shortMonth(r.month)), datasets: [
+      { label: "90th percentile", data: sp.map(r => r.p90), borderWidth: 0, pointRadius: 0, fill: false },
+      { label: "10th percentile", data: sp.map(r => r.p10), borderWidth: 0, pointRadius: 0, fill: "-1", backgroundColor: css("--cost-soft") },
+      { label: "Median user", data: sp.map(r => r.p50), borderColor: css("--cost"), borderWidth: 2, pointRadius: 0 },
+      { label: "Naive average", data: naive, borderColor: css("--waste"), borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 },
+    ] },
+    options: { scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: v => money(v) } } },
+      plugins: { marker: { index: i, color: css("--ink-3") }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
+  });
+  const s = sp.find(r => r.month === state.month);
+  cap.textContent = s ? `In ${monthName(state.month)}, the typical user cost ${money(s.p50)}, but the heaviest 10% cost over ${money(s.p90)} and the lightest 10% under ${money(s.p10)}. A flat average would bill everyone ${money(cur.cost_per_active_user)}.` : "";
+}
+
+// ---------- anomalies ----------
+const EVENT_NAMES = {
+  AVD_SCALING_PLAN_DISABLED: "Finance desktops left on around the clock", GPU_LEFT_RUNNING: "GPU machines left running after training",
+  LOG_INGESTION_SPIKE: "Debug logging flooded the log workspace", CROSS_REGION_REPLICATION_SPIKE: "Disaster recovery re-copied every disk",
+  SQL_SCALE_UP_NOT_REVERTED: "E-commerce database upsized, never shrunk", SYNAPSE_PAUSE_FAILURE: "Data warehouse stopped pausing at night",
+  RESERVATION_EXPIRED: "E-commerce reservation expired", FESTIVE_DEMAND: "Diwali sale traffic",
+  ORPHANED_RESOURCES: "Disks and IPs left by deleted VMs", DEVTEST_NO_AUTO_SHUTDOWN: "Dev VMs with no shutdown schedule",
+};
+const DATES = D.daily.dates;
+
+function baseline(series) {
+  // Same weekday over the previous 6 weeks. Flagged days are replaced by their baseline so one incident
+  // doesn't widen the range for the next; after 35 flagged days in a row the new level is accepted.
+  const med = a => { const s = a.slice().sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+  const clean = series.slice(), b = new Array(series.length).fill(null), f = new Array(series.length).fill(false);
+  let run = 0;
+  for (let t = 0; t < series.length; t++) {
+    const w = [];
+    for (let k = 1; k <= 6; k++) { const j = t - 7 * k; if (j >= 0 && clean[j] != null) w.push(clean[j]); }
+    if (w.length < 4 || series[t] == null) { run = 0; continue; }
+    const m = med(w), spread = Math.max(3 * 1.4826 * med(w.map(v => Math.abs(v - m))), 0.2 * m, 1);
+    b[t] = { m, hi: m + spread, lo: Math.max(0, m - spread) };
+    f[t] = series[t] > b[t].hi;
+    run = f[t] ? run + 1 : 0;
+    if (f[t] && run <= 35) clean[t] = m;
+  }
+  return { b, f };
+}
+const flags = series => baseline(series).f;
+
+function renderScore() {
+  // How the simple rule does against the answer key
+  const flagCache = {};
+  const hit = e => {
+    const f = flagCache[e.app_id] ??= flags(D.daily.apps[e.app_id].cost);
+    const s = DATES.indexOf(e.start_date), en = DATES.indexOf(e.win_end);
+    return f.slice(s, en + 1).some(Boolean);
+  };
+  const should = EVENTS.filter(e => ["spike", "step_change", "rate_change"].includes(e.category));
+  const legit = EVENTS.filter(e => e.category === "legit_growth");
+  const caught = should.filter(hit).length, alarms = legit.filter(hit).length;
+  const ongoing = EVENTS.filter(e => e.category === "ongoing_waste").length;
+  document.getElementById("an-score").innerHTML = `
+    <div><strong>${caught} of ${should.length}</strong>cost events caught by the rule within four weeks</div>
+    <div><strong>${alarms} of ${legit.length}</strong>Diwali sale periods also flagged; activity rose with cost, so these are growth, not waste</div>
+    <div><strong>${ongoing}</strong>slow, ongoing waste patterns a spike rule can't see; they appear on the Savings page</div>`;
+}
+
+function renderAnomalies() {
+  const sel = document.getElementById("an-app");
+  if (!sel.options.length) sel.innerHTML = APPS.map(a => `<option value="${a.app_id}">${esc(a.app_name)}</option>`).join("");
+  sel.value = state.anApp;
+  const a = D.daily.apps[state.anApp], [s, e] = state.range ?? [0, DATES.length - 1];
+  const sl = arr => arr.slice(s, e + 1), { b, f } = baseline(a.cost);
+  const labels = sl(DATES).map(d => toDate(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "2-digit", timeZone: "UTC" }));
+  draw("an-cost", {
+    type: "line",
+    data: { labels, datasets: [
+      { label: "Upper", data: sl(b).map(x => x?.hi ?? null), borderWidth: 0, pointRadius: 0, fill: false },
+      { label: "Lower", data: sl(b).map(x => x?.lo ?? null), borderWidth: 0, pointRadius: 0, fill: "-1", backgroundColor: css("--band") },
+      { label: "Daily cost", data: sl(a.cost), borderColor: css("--cost"), borderWidth: 1.6, pointRadius: 0, tension: 0 },
+      { label: "Flagged", data: sl(a.cost).map((v, t) => f[s + t] ? v : null), showLine: false, pointRadius: 3.5, pointBackgroundColor: css("--waste"), pointBorderWidth: 0 },
+    ] },
+    options: { scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 10, autoSkip: true } }, y: { beginAtZero: true, ticks: { callback: v => money(v) } } },
+      plugins: { tooltip: { filter: c => c.datasetIndex >= 2 && c.parsed.y != null, callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
+  });
+  // Activity relative to its own rolling median, and CPU
+  const ab = baseline(a.activity).b;
+  draw("an-signals", {
+    type: "line",
+    data: { labels, datasets: [
+      { label: "Activity vs usual", data: sl(a.activity).map((v, t) => v != null && ab[s + t]?.m ? 100 * v / ab[s + t].m : null), borderColor: css("--activity"), borderWidth: 1.6, pointRadius: 0, yAxisID: "y" },
+      { label: "Average CPU %", data: sl(a.cpu), borderColor: css("--cpu"), borderWidth: 1.6, pointRadius: 0, yAxisID: "y1" },
+    ] },
+    options: { scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }, y: { suggestedMin: 0, suggestedMax: 150 },
+      y1: { position: "right", min: 0, max: 100, grid: { display: false }, ticks: { callback: v => v + "%" } } },
+      plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(0)}` } } } }
+  });
+
+  const tbl = document.getElementById("an-events");
+  if (!tbl.innerHTML) {
+    const ch = (v, bad) => v == null ? "-" : `<span class="${bad && v > 10 ? "up-bad" : ""}">${pct(v, 0)}</span>`;
+    tbl.innerHTML = `<thead><tr><th>Event</th><th>App</th><th>Started</th><th>Cost</th><th>Activity</th><th>CPU</th><th>Verdict</th></tr></thead><tbody>${
+      EVENTS.map(ev => `<tr class="clickable" tabindex="0" data-event="${ev.anomaly_id}">
+        <td>${esc(EVENT_NAMES[ev.anomaly_type] ?? ev.anomaly_type)}<span class="tag">${esc(ev.description)}</span></td>
+        <td>${esc(appName[ev.app_id])}</td><td>${monthName(ev.start_date, { month: "short", day: "numeric", year: "numeric" })}</td>
+        <td>${ch(ev.cost_change_pct, true)}</td><td>${ch(ev.activity_change_pct)}</td><td>${ch(ev.cpu_change_pct)}</td>
+        <td class="${ev.is_waste ? "verdict-waste" : "verdict-ok"}">${ev.is_waste ? "Waste" : ev.category === "rate_change" ? "Price change" : "Real growth"}</td></tr>`).join("")}</tbody>`;
+  }
+  tbl.querySelectorAll("tr[data-event]").forEach(tr => tr.setAttribute("aria-selected", tr.dataset.event === state.event ? "true" : "false"));
+}
+
+// ---------- savings ----------
+function renderSavings() {
+  const total = FIND.reduce((t, r) => t + r.monthly_savings, 0), latest = MONTHS[MONTHS.length - 1];
+  document.getElementById("sa-lede").textContent = `${money(total)} a month in savings found in ${monthName(latest)}`;
+  const max = Math.max(...FIND.map(r => r.monthly_savings));
+  document.getElementById("sa-table").innerHTML = `<thead><tr><th>Action</th><th style="text-align:left">Applies to</th><th>Resources</th><th style="text-align:left">Why</th><th>Monthly savings</th></tr></thead><tbody>${
+    FIND.map(r => `<tr><td><strong>${esc(r.action)}</strong></td><td style="text-align:left">${esc(r.scope)}</td><td>${r.resources}</td>
+      <td class="wrap-text">${esc(r.evidence)}</td>
+      <td><span class="bar-cell"><span class="bar" style="width:${Math.max(4, 90 * r.monthly_savings / max)}px"></span>${money(r.monthly_savings)}</span></td></tr>`).join("")}
+    <tr><td><strong>Total</strong></td><td></td><td></td><td class="wrap-text">${money(total * 12)} a year at current rates.</td><td><strong>${money(total)}</strong></td></tr></tbody>`;
+
+  draw("sa-waste", {
+    type: "bar",
+    data: { labels: WASTE.map(r => shortMonth(r.month)), datasets: [
+      { label: "Idle capacity", data: WASTE.map(r => r.idle_cost), backgroundColor: css("--waste"), stack: "w" },
+      { label: "Orphaned resources", data: WASTE.map(r => r.orphaned_cost), backgroundColor: css("--activity"), stack: "w" },
+      { label: "Unused reservations", data: WASTE.map(r => r.unused_reservation_cost), backgroundColor: css("--ink-3"), stack: "w" }] },
+    options: { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ticks: { callback: v => money(v) } } },
+      plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
+  });
+
+  const names = [...new Set(RES.map(r => r.reservation))], colors = [css("--cost"), css("--activity"), css("--cpu")];
+  document.getElementById("sa-ri-legend").innerHTML = names.map((n, j) => `<span><i style="background:${colors[j]}"></i>${esc(n)}</span>`).join("");
+  draw("sa-ri", {
+    type: "line",
+    data: { labels: MONTHS.map(shortMonth), datasets: names.map((n, j) => ({ label: n, borderColor: colors[j], borderWidth: 2, pointRadius: 0, spanGaps: false,
+      data: MONTHS.map(m => { const r = RES.find(x => x.reservation === n && x.month === m); return r ? 100 * (r.used ?? 0) / ((r.used ?? 0) + (r.unused ?? 0)) : null; }) })) },
+    options: { scales: { x: { grid: { display: false } }, y: { suggestedMin: 80, max: 100.5, ticks: { callback: v => v <= 100 ? v + "%" : "" } } },
+      plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(1)}% used` } } } }
+  });
+}
+
+// ---------- routing and events ----------
+const RENDER = { overview: renderOverview, serve: renderServe, anomalies: renderAnomalies, savings: renderSavings };
+function show(page) {
+  state.page = RENDER[page] ? page : "overview";
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.page === state.page));
+  document.querySelectorAll(".page").forEach(p => p.hidden = p.id !== `page-${state.page}`);
+  document.getElementById("month-pick").style.visibility = ["overview", "serve"].includes(state.page) ? "visible" : "hidden";
+  if (location.hash.slice(1) !== state.page) history.replaceState(null, "", `#${state.page}`);
+  RENDER[state.page]();
+}
+
+const monthSel = document.getElementById("month");
+monthSel.innerHTML = MONTHS.slice().reverse().map(m => `<option value="${m}">${monthName(m)}</option>`).join("");
+monthSel.value = state.month;
+monthSel.addEventListener("change", () => { state.month = monthSel.value; RENDER[state.page](); });
+document.querySelector("nav.tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.page); });
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+  state.cmp = b.dataset.cmp; document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderOverview(); }));
+
+const activate = (el, fn) => { el.addEventListener("click", fn); el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(e); } }); };
+activate(document.getElementById("sv-table"), e => {
+  const s = e.target.closest("button[data-sort]");
+  if (s) { state.sort = { key: s.dataset.sort, dir: state.sort.key === s.dataset.sort ? -state.sort.dir : -1 }; return renderServe(); }
+  const tr = e.target.closest("tr[data-app]");
+  if (tr) { state.app = tr.dataset.app; document.querySelectorAll("#sv-table tr[data-app]").forEach(r => r.setAttribute("aria-selected", r === tr)); renderAppDetail(); }
+});
+document.getElementById("an-app").addEventListener("change", e => { state.anApp = e.target.value; state.range = null; state.event = null; renderAnomalies(); });
+document.getElementById("an-full").addEventListener("click", () => { state.range = null; state.event = null; renderAnomalies(); });
+activate(document.getElementById("an-events"), e => {
+  const tr = e.target.closest("tr[data-event]"); if (!tr) return;
+  const ev = EVENTS.find(x => x.anomaly_id === tr.dataset.event);
+  const s = DATES.indexOf(ev.start_date), en = DATES.indexOf(ev.end_date ?? ev.win_end);
+  state.anApp = ev.app_id; state.event = ev.anomaly_id;
+  state.range = [Math.max(0, s - 45), Math.min(DATES.length - 1, (en < 0 ? s + 27 : en) + 45)];
+  renderAnomalies(); document.getElementById("an-app").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => RENDER[state.page]());
+window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+document.getElementById("foot").textContent = `Synthetic data for a fictional company, generated by cloud-impact-analyzer. Costs in USD, FOCUS 1.0 format. Built ${D.meta.built}.`;
+// Open the anomaly chart zoomed on the Finance desktops incident
+{ const ev = EVENTS.find(x => x.anomaly_id === "ANM-001"), st = DATES.indexOf(ev.start_date), en = DATES.indexOf(ev.end_date);
+  state.event = ev.anomaly_id; state.range = [Math.max(0, st - 45), Math.min(DATES.length - 1, en + 45)]; }
+renderScore();
+show(location.hash.slice(1) || "overview");
+</script>
+</body>
+</html>
