@@ -1,0 +1,3 @@
+resource_id,app_id,resource_name,arm_type,environment,sku,deleted_date
+/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.compute/virtualmachines/vm-shop-01,SHOP,vm-shop-01,microsoft.compute/virtualmachines,prod,D4s_v5,
+/subscriptions/0000/resourcegroups/rg-shop-dev/providers/microsoft.compute/disks/vm-old-osdisk,SHOP,vm-old-osdisk,microsoft.compute/disks,dev,P10,

@@ -1,0 +1,61 @@
+# Start here for your own organization. Copy this file, fill it in, then run:
+#   python -m attribution --config config/<your-file>.toml
+#   python -m dashboard --config config/<your-file>.toml
+# Only [data] cost is required. CSV templates for every other input are in templates/.
+
+[organization]
+name = "Your organization"
+description = "Cloud spend traced to the apps, teams and transactions behind it."
+footer = "Costs from the FOCUS cost export."
+currency_symbol = "$"
+
+[data]
+database = "data/my-org/analyzer.duckdb"    # where results are stored (created if missing)
+cost = "data/my-org/focus/*.parquet"        # your FOCUS export: .parquet or .csv files, globs allowed
+inventory = ""                              # templates/inventory.csv
+sessions = ""                               # templates/sessions.csv
+users = ""                                  # templates/users.csv
+activity = ""                               # templates/activity.csv
+metrics = ""                                # templates/metrics.csv
+ground_truth = ""
+
+[headline]
+label = "orders"          # your company-wide business number
+scale = 1000
+
+[allocation]
+session_weight = "hours_x_cpu"   # hours_x_cpu | hours | count
+shared_split = "proportional"    # proportional | even
+
+[mapping]
+use_inventory = true
+rules = [
+  { type = "tag", key = "app" },                                        # tag value = app id, name or alias
+  { type = "resource_group", pattern = "rg-platform-*", app = "PLATFORM" },
+]
+
+[[apps]]
+id = "SHOP"
+name = "Online Store"
+team = "Engineering"
+split = "owner"
+unit = "transactions"
+unit_label = "per 1,000 orders"
+headline = true
+serves_headline = true
+revenue = true
+customer_facing = true
+aliases = ["webshop", "store"]
+
+[[apps]]
+id = "CRM"
+name = "Sales CRM"
+team = "Sales"
+split = "sessions"
+unit = "active_users"
+
+[[apps]]
+id = "PLATFORM"
+name = "Shared Platform"
+team = "IT"
+role = "shared"

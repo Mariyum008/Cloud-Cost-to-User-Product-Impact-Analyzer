@@ -1,0 +1,3 @@
+session_date,app_id,user_id,resource_id,duration_hours,cpu_share_pct
+2026-09-01,DESKTOP,u-7f3a,/subscriptions/0000/resourcegroups/rg-avd-prod/providers/microsoft.compute/virtualmachines/vm-avd-003,6.5,4.2
+2026-09-01,CRM,u-19c2,,2.1,

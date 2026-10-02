@@ -1,37 +1,44 @@
 -- Step 4: split session-based apps down to users (rules R1 and R2) and isolate idle cost.
 
--- Each session's weight
+-- Each session's weight, for apps whose effective split uses sessions
 CREATE OR REPLACE TEMP TABLE sess AS
-SELECT session_date::DATE AS date, date_trunc('month', session_date)::DATE AS month, app_id, resource_id, user_id,
-       duration_hours AS hours,
-       duration_hours * cpu_share_pct AS w
-FROM sessions;
+SELECT s.session_date AS date, date_trunc('month', s.session_date)::DATE AS month, s.app_id, s.resource_id, s.user_id,
+       s.duration_hours AS hours,
+       CASE (SELECT value FROM cfg_settings WHERE key = 'session_weight')
+           WHEN 'count' THEN 1.0
+           WHEN 'hours' THEN s.duration_hours
+           ELSE s.duration_hours * coalesce(s.cpu_share_pct, 1)
+       END AS w
+FROM in_sessions s
+JOIN app_rules r USING (app_id)
+WHERE r.effective_split IN ('sessions', 'sessions_by_host');
 
--- Daily cost of each AVD host VM
+-- Hosts: in split-by-host apps, VMs plus anything sessions point at
 CREATE OR REPLACE TEMP TABLE host_cost AS
 SELECT c.date, c.app_id, c.resource_id, c.cost
 FROM cost_resource_daily c
-JOIN apps a USING (app_id)
-WHERE c.cost_class = 'direct' AND a.app_kind = 'avd'
-  AND c.arm_type = 'microsoft.compute/virtualmachines';
+JOIN app_rules r USING (app_id)
+LEFT JOIN resource_dim d USING (resource_id)
+WHERE c.cost_class = 'direct' AND r.effective_split = 'sessions_by_host'
+  AND (d.is_vm OR c.resource_id IN (SELECT DISTINCT resource_id FROM sess WHERE app_id = c.app_id));
 
 -- Total weight per host-day and per app-month (the denominators of every split).
--- Hosts scale daily, so they split daily; the rest is always-on, so it splits over the month
--- (otherwise one person using HR Portal on a Sunday would carry that whole day's cost).
+-- Hosts scale daily, so they split daily; the rest is always-on, so it splits over the month.
 CREATE OR REPLACE TEMP TABLE host_w AS SELECT date, resource_id, sum(w) AS w_total FROM sess GROUP BY ALL;
 CREATE OR REPLACE TEMP TABLE app_w AS SELECT month, app_id, sum(w) AS w_total FROM sess GROUP BY ALL;
 
--- App-month cost not tied to one host: disks, profiles, web/data/ML resources, and the shared slice
+-- App-month cost not tied to one host, plus the app's shared slice
 CREATE OR REPLACE TEMP TABLE app_pool AS
 SELECT date_trunc('month', a.date)::DATE AS month, a.app_id,
        sum(a.direct_cost - coalesce(h.host_total, 0)) AS pool_direct,
        sum(a.shared_cost) AS shared_cost
 FROM cost_app_daily a
+JOIN app_rules r USING (app_id)
 LEFT JOIN (SELECT date, app_id, sum(cost) AS host_total FROM host_cost GROUP BY ALL) h USING (date, app_id)
-WHERE a.app_id IN (SELECT DISTINCT app_id FROM sess)
+WHERE r.effective_split IN ('sessions', 'sessions_by_host')
 GROUP BY ALL;
 
--- Every session's share of its host-day (R1), its app-month pool (R2) and the app's shared slice
+-- Every session's share of its host-day (R1), its app-month pool (R2) and the shared slice
 CREATE OR REPLACE TABLE cost_user_monthly AS
 WITH pieces AS (
     SELECT s.month, s.app_id, s.user_id, s.hours,
@@ -46,7 +53,7 @@ WITH pieces AS (
 )
 SELECT p.month,
        p.user_id,
-       u.team,
+       coalesce(u.team, 'Unknown team') AS team,
        p.app_id,
        count(*) AS sessions,
        round(sum(p.hours), 2) AS session_hours,
@@ -54,7 +61,7 @@ SELECT p.month,
        sum(p.shared_part) AS shared_cost,
        sum(p.host_part + p.pool_part + p.shared_part) AS total_cost
 FROM pieces p
-JOIN users u USING (user_id)
+LEFT JOIN in_users u USING (user_id)
 GROUP BY ALL;
 
 -- Idle: cost with nobody using it, kept with the app but never charged to users.

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import duckdb
 
+from attribution import setup
 from .queries import QUERIES
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -54,22 +55,29 @@ def reshape_daily(d):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default=str(ROOT / "data" / "synthetic" / "cloud_impact.duckdb"))
+    ap.add_argument("--config", default=str(ROOT / "config" / "contoso.toml"))
+    ap.add_argument("--db", help="override [data] database from the config")
     ap.add_argument("--out", default=str(ROOT / "docs" / "index.html"))
     a = ap.parse_args()
-    if not Path(a.db).exists():
-        sys.exit(f"Database not found: {a.db}. Run `python -m generator` and `python -m attribution` first.")
+    try:
+        cfg = setup.load(a.config)
+    except setup.ConfigError as e:
+        sys.exit(str(e))
+    db = Path(a.db or cfg["data"].get("database", "data/analyzer.duckdb"))
+    db = db if db.is_absolute() else ROOT / db
+    if not db.exists():
+        sys.exit(f"Database not found: {db}. Run `python -m attribution --config {a.config}` first.")
 
-    con = duckdb.connect(a.db, read_only=True)
-    if not con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = 'cost_app_daily'").fetchone()[0]:
-        sys.exit("Attribution tables missing. Run `python -m attribution` first.")
+    con = duckdb.connect(str(db), read_only=True)
+    if not con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = 'run_info'").fetchone()[0]:
+        sys.exit(f"Attribution results missing. Run `python -m attribution --config {a.config}` first.")
     data = {}
     for name, sql in QUERIES.items():
         data[name] = columns(con, sql)
         print(f"  {name:<20} {len(next(iter(data[name].values()), [])):>6} rows")
     con.close()
     data["daily"] = reshape_daily(data["daily"])
-    data["meta"] = {"company": "Contoso Retail India", "built": datetime.now().strftime("%Y-%m-%d %H:%M")}
+    data["meta"] = {k: v[0] for k, v in data["meta"].items()} | {"built": datetime.now().strftime("%Y-%m-%d %H:%M")}
 
     # Inline data and Chart.js into the template so the output is a single portable file
     html = (HERE / "template.html").read_text()

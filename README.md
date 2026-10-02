@@ -1,144 +1,156 @@
 # Cloud Cost to User & Product Impact Analyzer
 
-How does infrastructure spending translate into user activity and business outcomes?
+**A cloud bill tells you how much you spent. This tool tells you who spent it, what it produced, and whether it was worth it.**
 
-Phase 1 is a synthetic but realistic company whose Azure bill, workforce activity, and customer demand are causally linked. Cost is derived from usage, and usage is derived from people and transactions. That means attribution and anomaly detection have a real signal to find, and there's a ground-truth answer key to score them against.
+It traces every dollar of an Azure bill (in the industry-standard FOCUS format) to the apps, teams, users and orders behind it, flags days when cost moved without the business moving, and ranks concrete savings.
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![DuckDB](https://img.shields.io/badge/DuckDB-SQL-FFF000?logo=duckdb&logoColor=black)
+![FOCUS 1.0](https://img.shields.io/badge/FinOps-FOCUS%201.0-1F5F8B)
+![Chart.js](https://img.shields.io/badge/Chart.js-dashboard-FF6384?logo=chartdotjs&logoColor=white)
+
+### [View the live dashboard](https://mariyum008.github.io/Cloud-Cost-to-User-Product-Impact-Analyzer/)
+
+![Dashboard overview](docs/images/overview.png)
+
+## The problem
+
+Most cloud cost dashboards stop at "we spent $131K this month, mostly on compute." That doesn't answer the questions that matter to a business:
+
+- **Who** drove the cost: which team, which app, which users?
+- **What did it produce:** how much does one order, or one employee's desktop, cost to run?
+- **Was it worth it:** is cost growing faster than the business, and how much paid for nothing?
+
+This project answers them by joining the cloud bill to activity data, and splitting every dollar with transparent, written rules.
+
+## Key findings
+
+Run on a synthetic company of 5,000 employees and 20 applications over 24 months ($2.98M of Azure spend):
+
+| Finding | What the tool showed |
+|---|---|
+| A broken autoscaling setting | Finance desktop cost per user jumped from **$27.61 to $67.44** in one month, with **28% of it idle hosts** nobody used. The total bill barely hinted at it. |
+| Efficiency slipping | E-commerce cost per 1,000 orders rose **30%** ($10.42 to $13.52) while order volume grew, from an unreverted database resize and an expired reservation. |
+| Uneven usage | The typical Finance desktop user costs about **$27 a month**, but the heaviest 10% cost over **$45**. A flat average hides this. |
+| Savings found | **$6,292 a month** ($75.5K a year) from nine rule-based findings: oversized databases, missing reservations, dev VMs without shutdown schedules, orphaned disks. |
+| Works from the bill alone | Given only the raw FOCUS export, it mapped **96% of cost** to apps through tags and still detected the planted incidents. |
+
+All data is synthetic, generated with known planted events, so every finding can be checked against an answer key.
+
+## How it works
+
+```mermaid
+flowchart LR
+    G["Generator<br/>synthetic company"] --> T[("FOCUS bill<br/>+ activity data")]
+    T --> V["Validator<br/>FOCUS rules"]
+    C["Config file<br/>apps and split rules"] --> A
+    T --> A["Attribution engine<br/>split every dollar"]
+    A --> M[("Metrics<br/>unit costs, KPIs")]
+    M --> D["Dashboard<br/>static HTML"]
+```
+
+1. **Generator:** simulates a company day by day. Employees log in, customers place orders, computers are sized from that activity, and the Azure bill is calculated from the computers, in Microsoft's FOCUS export format. Problems are planted on purpose, with an answer key.
+2. **Attribution engine:** maps each resource to an app, sorts each dollar into direct, shared or waste, splits shared platform cost across apps, then splits each app across its users by hours and CPU used. Four reconciliation checks prove every dollar lands exactly once.
+3. **Dashboard:** a single self-contained HTML page (no server) with five views, published with GitHub Pages.
 
 ## Quick start
 
 ```bash
 pip install -r requirements.txt
-python -m generator                      # about 40s, writes data/synthetic/
-python validation/validate_focus.py      # checks the cost data against FOCUS 1.0 + Microsoft open data
-python -m attribution                    # Phase 2: splits every dollar to apps, teams and users (about 30s)
-python -m dashboard                      # Phase 3: builds docs/index.html, the interactive dashboard
+python -m generator                   # build the synthetic company (about 40s)
+python validation/validate_focus.py   # check the bill against FOCUS 1.0 and Microsoft reference data
+python -m attribution                 # split every dollar to apps, teams and users
+python -m dashboard                   # build docs/index.html
+open docs/index.html
 ```
 
-Close any notebook or DBeaver connection to `cloud_impact.duckdb` before running the generator or the attribution engine, since both write to it.
+Use `--seed 7` for a different company, or `--users 500 --months 6` for a fast test run.
 
-Options: `--seed 7` for a different company, `--users 500 --months 6` for a fast test run, `--csv` to also export every table as CSV for Power BI or Excel.
+## Use it on your own bill
 
-## The synthetic company
+The engine is driven by one config file, so it runs on any organization's FOCUS export (Azure, AWS or Google Cloud). Only the cost export is required; each extra input unlocks more analysis.
 
-Contoso Retail India: 5,000 employees in 12 teams, 20 applications, 24 months (Oct 2024 - Sep 2026), Central India region with DR in South India.
-
-| Kind | Apps | Runs on |
+| Level | You provide | You get |
 |---|---|---|
-| Virtual desktops | Contact Center, Finance, Developer, Office pools | AVD session hosts (D4s/E8s/D8s v5), OS disks, FSLogix premium files |
-| Internal web | Finance ERP, HR Portal, Sales CRM, Ticketing, Document Mgmt, BI | App Service plans, Azure SQL, storage, plus dev environments |
-| Customer-facing | Customer Portal, E-commerce, Payments, Mobile backend | AKS, App Service, SQL, Cosmos DB, Redis, App Gateway, bandwidth |
-| Data and ML | Data Warehouse, ETL, ML Platform | Synapse, Data Factory, Databricks, A100 GPU VMs, data lake |
-| Shared | Dev/Test, Backup & DR, Shared Platform | Dev VMs, Recovery Services, VPN, Log Analytics, Key Vault |
+| 1 | A FOCUS cost export | Spend by app and team via tags, unused reservations, reservation candidates, unusual-cost episodes |
+| 2 | + daily activity per app | Unit costs (per order, per request), cost vs business growth, telling waste from growth |
+| 3 | + user sessions | Cost per user and per team, idle capacity, the spread of cost across users |
 
-Behaviour that is modelled: shift work in the contact center, autoscaling host pools, headcount growth and attrition, Indian holidays, payday and Diwali demand peaks, data growth, three reservations (one expires and isn't renewed), about 4% untagged spend, and a 5% EA discount.
-
-## Tables
-
-All tables are in `data/synthetic/cloud_impact.duckdb` and as Parquet files.
-
-| Table | Grain | Purpose |
-|---|---|---|
-| `focus_cost` | resource x meter x day | Azure cost in FOCUS 1.0 format, same columns as a Microsoft FOCUS export (all 44 core columns + 17 `x_` columns) |
-| `resources` | resource | Inventory (CMDB): app, environment, SKU, lifecycle, tags |
-| `resource_daily_metrics` | resource x day | Running hours and average CPU for compute |
-| `sessions` | session | Who used which app on which resource, for how long, CPU share, memory, business actions (4.4M rows) |
-| `business_metrics` | app x day | Active users, session hours, transactions, revenue, data processed |
-| `users`, `teams`, `apps` | dimension | Org structure and cost centers |
-| `reservations` | reservation | Commitments and their terms |
-| `anomalies_ground_truth` | event | Answer key: planted events, windows, affected resources, whether it's waste |
-
-The key join path:
-
-```
-focus_cost.ResourceId -> resources.resource_id -> resources.app_id -> apps
-                         resources.resource_id <- sessions.resource_id -> users -> teams
-                         resources.app_id      -> business_metrics.app_id
+```bash
+cp config/template.toml config/my-org.toml   # point it at your files and list your apps
+python -m attribution --config config/my-org.toml
+python -m dashboard --config config/my-org.toml --out docs/my-org.html
 ```
 
-Join cost to apps through `resources`, not through `Tags`. Some resources are untagged on purpose, just like real estates.
+CSV templates for every input are in `templates/`. [`docs/bill-only.html`](docs/bill-only.html) shows what Level 1 looks like.
 
-## Phase 2: attribution engine
-
-`python -m attribution` runs the SQL in `sql/attribution/` (in file order), then `sql/metrics/`, then reconciles. Every dollar on the bill must land in exactly one place, and the run fails if it doesn't.
-
-| Step | File | Output |
-|---|---|---|
-| 1 | `10_cost_resource_daily.sql` | `cost_resource_daily`: each resource-day classified as direct, shared, orphaned, or unused_reservation |
-| 2 | `20_allocation_rules.sql` | `allocation_rules`: the written rules R1-R5 behind every split |
-| 3 | `30_cost_app_daily.sql` | `cost_app_daily`: direct cost per app, plus its share of shared platform cost |
-| 4 | `40_cost_user.sql` | `cost_user_monthly` (user x app x month) and `cost_idle` (cost nobody was using) |
-| 5 | `50_cost_team_monthly.sql` | `cost_team_monthly`: every dollar per team, labelled user_activity, owned_app, idle_capacity, or waste |
-| - | `metrics/10_metrics_views.sql` | `v_kpi_monthly`, `v_app_monthly`, `v_team_monthly`: the KPIs the dashboard will read |
-
-The rules:
-
-- **R1 AVD hosts:** each host-day is split across the sessions on it by `duration_hours x cpu_share_pct`. Host-days with nobody on them are idle.
-- **R2 Everything else in a user-facing app:** split the same way across the app's sessions for the month. Always-on cost is split monthly so a lone weekend user doesn't absorb a full day.
-- **R3 Shared platform:** split across apps by each app's share of that day's direct cost, then down to users via R2.
-- **R4 Customer-facing apps, ETL, Dev/Test:** charged to the owner team and measured per transaction instead of per user.
-- **R5 Orphaned disks/IPs and unused reservations:** left unallocated so waste stays visible.
-
-Reconciliation checks: resource layer = bill, apps + unallocated = bill, users + idle = session-app cost, and teams = bill.
-
-Attribution answers *who* consumed cost. Waste caused by low utilization (an idle GPU, Synapse not pausing, dev VMs without auto-shutdown) is still charged to the app that owns it. Finding that kind of waste is the job of anomaly detection and recommendations in later phases.
-
-## Phase 3: dashboard
-
-`python -m dashboard` runs the queries in `dashboard/queries.py` against the attributed database and writes `docs/index.html`: one self-contained file with the data, the page, and Chart.js inlined. Open it in any browser, no server needed. Rerun it whenever you regenerate data.
+## The dashboard
 
 | Page | Answers |
 |---|---|
-| Overview | What did the month cost, is cost keeping pace with orders and headcount, and where did every dollar go? |
-| Cost to serve | What does each app cost per user or per 1,000 transactions, and how unevenly is that spread across users? |
-| Anomalies | Which days did cost jump without activity moving? A same-weekday baseline rule, scored against the answer key. |
-| Savings | Rule-based findings for the latest month: orphaned resources, unused reservations, dev VMs without schedules, oversized databases, reservation candidates. |
+| **Overview** | What did the month cost, and is cost keeping pace with orders and headcount? |
+| **Billing** | What did each subscription and resource group cost, as effective cost or as invoiced? |
+| **Cost to serve** | What does each app cost per user or per 1,000 transactions, and how unevenly is that spread? |
+| **Anomalies** | Which days did cost jump without activity moving, and was it waste or growth? |
+| **Savings** | What should we do about it, ranked by monthly savings? |
 
-To publish it on GitHub Pages: push the repo, then in the repo's **Settings > Pages**, set the source to the `main` branch and the `/docs` folder. The dashboard will be live at `https://<your-username>.github.io/<repo-name>/`.
+<details>
+<summary>Screenshots</summary>
 
-The anomaly rule and savings checks are deliberately simple baselines. Phase 4 (anomaly detection) and Phase 6 (recommendations) replace them with stronger methods, measured against the same answer key.
+**Billing:** subscriptions and resource groups, with what each spends on
 
-## Ground truth
+![Billing](docs/images/billing.png)
 
-`anomalies_ground_truth` lists 11 events across five categories:
+**Cost to serve:** the Finance desktops during the autoscaling incident
 
-- **spike:** something broke, cost jumps with no business reason.
-- **step_change:** a permanent shift, such as a resize that was never reverted.
-- **rate_change:** same usage at a higher price, such as an expired reservation.
-- **legit_growth:** Diwali demand. This is a negative control: cost rises with transactions and should not be flagged.
-- **ongoing_waste:** a continuous inefficiency, such as orphaned disks or dev VMs without auto-shutdown.
+![Cost to serve](docs/images/cost-to-serve.png)
 
-Use the table to score detectors (precision, recall, time to detect) in Phase 4. If you want to test blind first, don't read it.
+**Anomalies:** cost against its expected range, with activity and CPU to separate waste from growth
 
-## Validation
+![Anomalies](docs/images/anomalies.png)
 
-`validation/validate_focus.py` checks FOCUS 1.0 core columns, allowed values, service/category pairs and regions against Microsoft's `Services.csv` and `Regions.csv`, non-negative costs, period alignment, `ListCost = PricingQuantity x ListUnitPrice`, reservation rules, and that amortization closes (monthly BilledCost equals EffectiveCost). It writes `reports/validation_report.md` and exits non-zero on failure.
+**Savings:** ranked findings for the latest month
 
-To also compare against Microsoft's real sample export, download `src/open-data/dataset-examples/EA-Cost-FOCUS_1.0.csv` from [microsoft/finops-toolkit](https://github.com/microsoft/finops-toolkit). It's stored with Git LFS, so use the "Download raw file" button on GitHub or `git lfs pull`. Then run:
+![Savings](docs/images/savings.png)
 
-```bash
-python validation/validate_focus.py --sample path/to/EA-Cost-FOCUS_1.0.csv
-```
+</details>
 
-This adds column coverage, value-domain overlap, cost share by service category, unit-price ratios on shared meters, and daily grain. The sample comes from a small demo account, so treat cost-share differences as context, not failures.
-
-## Layout
+## Project structure
 
 ```
-generator/      config.py (all knobs), demand.py (people, sessions, customers), infra.py (resources + metered usage),
-                anomalies.py (planted events), focus.py (FOCUS rows + reservations), __main__.py (pipeline)
-validation/     validate_focus.py
-attribution/    __main__.py (runs the SQL steps and reconciliation)
-dashboard/      __main__.py (export), queries.py, template.html, vendor/ (Chart.js, MIT)
-docs/           index.html, the built dashboard (served by GitHub Pages)
-sql/            sanity_checks.sql, 01_cost_per_user_naive_vs_weighted.sql,
-                attribution/ (steps 10-50), metrics/ (KPI views)
-data/reference/ Microsoft FinOps toolkit open data (MIT, see LICENSE-finops-toolkit.txt)
+generator/      synthetic company: config.py (all settings), demand.py, infra.py, anomalies.py, focus.py
+validation/     validate_focus.py: checks the bill against FOCUS 1.0 and Microsoft open data
+config/         contoso.toml (synthetic company), example-bill-only.toml (level 1), template.toml (start here)
+templates/      CSV templates for every optional input
+attribution/    setup.py (config, inputs, mapping) and the engine runner with reconciliation
+sql/            attribution/ (steps 10-50), metrics/ (KPI views), exploration queries
+dashboard/      export script, queries, HTML template, vendored Chart.js
+docs/           built dashboards, screenshots, and the technical reference
+data/reference/ Microsoft FinOps toolkit open data
 ```
 
-## Assumptions and limits
+Full details on tables, inputs, allocation rules, the answer key and validation are in the **[technical reference](docs/reference.md)**.
 
-- Prices are approximate Central India pay-as-you-go list prices in USD, rounded. Edit `PRICES` in `config.py` to change them, or plug in a real price sheet.
-- Session `cpu_share_pct` is the share of the serving resource's CPU used by that session. It's the main attribution weight.
-- One session per user per app per day.
-- Dev/test and platform apps have no `business_metrics` rows. They are shared costs for the attribution engine to allocate.
-- All data is synthetic. No employer or client data is used.
+## Tech stack
+
+Python, NumPy and pandas for simulation; DuckDB and SQL for the attribution engine; Parquet for storage; FOCUS 1.0 with Microsoft's FinOps toolkit reference data; Chart.js with plain HTML, CSS and JavaScript for the dashboard; GitHub Pages for hosting.
+
+## Roadmap
+
+- [x] **Phase 1:** synthetic company with a causally linked Azure bill and a planted-event answer key
+- [x] **Phase 2:** attribution engine with reconciliation, configurable for any organization
+- [x] **Phase 3:** interactive dashboard
+- [ ] **Phase 4:** machine learning anomaly detection, scored against the answer key
+- [ ] **Phase 5:** cost forecasting
+- [ ] **Phase 6:** recommendation engine
+- [ ] **Phase 7:** upload wizard and direct cloud connectors
+
+## Limitations
+
+- The data is synthetic, and the planted events were designed alongside the detection, so results show the method works, not how it performs on every real estate.
+- Prices are approximate Azure list prices, rounded.
+- The anomaly rule (same weekday over six weeks) and savings checks are simple baselines; Phase 4 replaces them with stronger methods measured against the same answer key.
+
+## Acknowledgments
+
+Reference data from Microsoft's [FinOps toolkit](https://github.com/microsoft/finops-toolkit) (MIT). Charts by [Chart.js](https://www.chartjs.org/) (MIT). Cost data follows the [FOCUS specification](https://focus.finops.org/) from the FinOps Foundation.

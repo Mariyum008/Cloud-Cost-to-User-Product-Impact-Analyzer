@@ -1,0 +1,137 @@
+# Level 1 example: only a FOCUS cost export, mapped to apps through tags.
+# Shows what the analyzer gives an organization before it shares any activity data.
+# Run with: python -m attribution --config config/example-bill-only.toml
+
+[organization]
+name = "Contoso Retail India (bill only)"
+description = "Azure spend analyzed from the FOCUS bill alone, mapped to apps through resource tags."
+footer = "Synthetic data, Level 1 (cost export only). Costs in USD, FOCUS 1.0 format."
+currency_symbol = "$"
+
+[data]
+database = "data/bill-only/analyzer.duckdb"       # results go in their own database
+cost = "data/synthetic/focus_cost.parquet"        # a FOCUS export file, as an organization would provide it
+inventory = ""
+sessions = ""
+users = ""
+activity = ""
+metrics = ""
+ground_truth = ""
+
+[headline]
+label = "transactions"
+scale = 1000
+
+[allocation]
+session_weight = "hours_x_cpu"
+shared_split = "proportional"
+
+[mapping]
+use_inventory = false
+rules = [
+  { type = "tag", key = "app" },
+  { type = "resource_group", pattern = "rg-shared-platform-*", app = "A20" },
+  { type = "resource_group", pattern = "rg-backup-dr-*", app = "A19" },
+]
+
+[[apps]]
+id = "A01"
+name = "AVD Contact Center Desktops"
+team = "IT"
+
+[[apps]]
+id = "A02"
+name = "AVD Finance Desktops"
+team = "IT"
+
+[[apps]]
+id = "A03"
+name = "AVD Developer Workstations"
+team = "IT"
+
+[[apps]]
+id = "A04"
+name = "AVD Office Desktops"
+team = "IT"
+
+[[apps]]
+id = "A05"
+name = "Finance ERP"
+team = "Finance"
+
+[[apps]]
+id = "A06"
+name = "HR Portal"
+team = "HR"
+
+[[apps]]
+id = "A07"
+name = "Sales CRM"
+team = "Sales"
+
+[[apps]]
+id = "A08"
+name = "Support Ticketing"
+team = "Customer Support"
+
+[[apps]]
+id = "A09"
+name = "Document Management"
+team = "IT"
+
+[[apps]]
+id = "A10"
+name = "BI Reporting"
+team = "Data & Analytics"
+
+[[apps]]
+id = "A11"
+name = "Customer Portal"
+team = "Customer Support"
+
+[[apps]]
+id = "A12"
+name = "E-commerce Platform"
+team = "Engineering"
+
+[[apps]]
+id = "A13"
+name = "Payments Service"
+team = "Finance"
+
+[[apps]]
+id = "A14"
+name = "Mobile App Backend"
+team = "Engineering"
+
+[[apps]]
+id = "A15"
+name = "Data Warehouse"
+team = "Data & Analytics"
+
+[[apps]]
+id = "A16"
+name = "ETL Pipelines"
+team = "Data & Analytics"
+
+[[apps]]
+id = "A17"
+name = "ML Platform"
+team = "Data & Analytics"
+
+[[apps]]
+id = "A18"
+name = "Dev/Test Environments"
+team = "Engineering"
+
+[[apps]]
+id = "A19"
+name = "Backup & DR"
+team = "IT"
+role = "shared"
+
+[[apps]]
+id = "A20"
+name = "Shared Platform"
+team = "IT"
+role = "shared"

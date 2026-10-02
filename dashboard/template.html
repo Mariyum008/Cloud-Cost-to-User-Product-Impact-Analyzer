@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cloud cost to impact - Contoso Retail India</title>
+<title>Cloud cost to impact</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&display=swap" rel="stylesheet">
@@ -75,6 +75,9 @@ h2 { font-stretch: 85%; font-weight: 620; font-size: 19px; margin: 0 0 4px; lett
 .chart { position: relative; height: 320px; }
 .chart.tall { height: 380px; }
 .chart.short { height: 190px; }
+.level { font-size: 13px; color: var(--ink-3); margin: 10px 0 0; }
+.level b { color: var(--ink-2); font-weight: 600; }
+.empty { color: var(--ink-3); font-size: 14px; padding: 18px 0; max-width: 60ch; }
 .caption { font-size: 14px; color: var(--ink-2); margin: 12px 0 0; max-width: 72ch; }
 
 /* ---------- KPI readout ---------- */
@@ -89,6 +92,11 @@ h2 { font-stretch: 85%; font-weight: 620; font-size: 19px; margin: 0 0 4px; lett
 .chip.bad { background: var(--waste-soft); color: var(--waste); }
 .chip.good { background: var(--cpu-soft); color: var(--cpu); }
 .chip.info { background: var(--cost-soft); color: var(--cost); }
+/* Cost changes: increases bold red, decreases bold green */
+.chip.up, .up { color: var(--waste) !important; font-weight: 700 !important; }
+.chip.down, .down { color: var(--cpu) !important; font-weight: 700 !important; }
+.chip.up { background: var(--waste-soft); }
+.chip.down { background: var(--cpu-soft); }
 
 /* ---------- segmented control with sliding thumb ---------- */
 .seg { position: relative; display: inline-flex; background: var(--sunk); border: 1px solid var(--rule); border-radius: 10px; padding: 3px; }
@@ -108,6 +116,7 @@ h2 { font-stretch: 85%; font-weight: 620; font-size: 19px; margin: 0 0 4px; lett
 .fill { display: block; height: 100%; width: 0; border-radius: 5px; background: var(--cost); transition: width .9s var(--ease); }
 .fill.w { background: var(--waste); }
 .fill.g { background: var(--cpu); }
+.fill.u { background: var(--activity); }
 
 /* ---------- master/detail with a rail ---------- */
 .split { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
@@ -161,9 +170,27 @@ h2 { font-stretch: 85%; font-weight: 620; font-size: 19px; margin: 0 0 4px; lett
 .find.open .expand { grid-template-rows: 1fr; }
 .expand > div { overflow: hidden; }
 .expand p { margin: 0; padding: 0 24px 16px; color: var(--ink-2); font-size: 14px; max-width: 70ch; }
+.ri-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 18px; }
+.ri-table th { text-align: left; font-weight: 500; font-size: 12px; color: var(--ink-3); padding: 6px 8px 6px 0; border-bottom: 1px solid var(--rule); }
+.ri-table td { padding: 10px 8px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.ri-table td.num, .ri-table th.num { text-align: right; }
+.ri-table i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
 .find-total { display: flex; justify-content: space-between; padding: 16px 24px 10px; border-top: 1px solid var(--ink); font-weight: 600; }
 @media (max-width: 700px) { .find > button { grid-template-columns: 1fr auto 20px; } .find .track { display: none; } }
 
+/* ---------- billing ---------- */
+.rg { border-top: 1px solid var(--rule); }
+.rg > button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 150px 96px 72px 20px; gap: 14px; align-items: center; background: none; border: 0; text-align: left; padding: 12px 6px; cursor: pointer; border-radius: 8px; transition: background .2s; }
+.rg > button:hover { background: var(--sunk); }
+.rg.open > button { background: var(--cost-soft); }
+.rg .rg-name { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.rg .rg-meta { display: block; font-size: 12px; color: var(--ink-3); }
+.rg .amt { text-align: right; font-weight: 600; }
+.rg .chip { justify-self: end; }
+.rg.open .chev { transform: rotate(-135deg); }
+.rg.open .expand { grid-template-rows: 1fr; }
+.rg .svc { padding: 8px 6px 18px; }
+@media (max-width: 700px) { .rg > button { grid-template-columns: 1fr auto 20px; } .rg .track, .rg .chip { display: none; } }
 footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--ink-3); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -175,10 +202,11 @@ footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--i
   <div class="wrap">
     <div class="brand">
       <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M4 18a9 9 0 0 1 18 0" fill="none" stroke="var(--rule)" stroke-width="3" stroke-linecap="round"/><path d="M4 18a9 9 0 0 1 13-8" fill="none" stroke="var(--cost)" stroke-width="3" stroke-linecap="round"/><path d="M13 18l5-6" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg>
-      Cloud cost to impact<small>Contoso Retail India</small>
+      Cloud cost to impact<small id="org-name"></small>
     </div>
     <nav class="tabs" role="tablist" aria-label="Dashboard pages">
       <button role="tab" data-page="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-page="billing" aria-selected="false">Billing</button>
       <button role="tab" data-page="serve" aria-selected="false">Cost to serve</button>
       <button role="tab" data-page="anomalies" aria-selected="false">Anomalies</button>
       <button role="tab" data-page="savings" aria-selected="false">Savings</button>
@@ -194,16 +222,17 @@ footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--i
   <section class="page stack" id="page-overview" role="tabpanel">
     <div class="intro reveal" style="--i:0">
       <h1 class="lede" id="ov-lede"></h1>
-      <p class="sub">Azure spend for 5,000 employees and four customer-facing products, traced from the bill to the people and transactions behind it.</p>
+      <p class="sub" id="ov-desc"></p>
+      <p class="level" id="ov-level"></p>
     </div>
     <div class="panel kpis reveal" style="--i:1" id="ov-kpis"></div>
     <article class="panel reveal" style="--i:2">
       <div class="panel-head">
-        <div><h2>Is cost keeping pace with the business?</h2>
+        <div><h2 id="ov-hero-title">Is cost keeping pace with the business?</h2>
           <p class="note">100 = each line's average over the first 12 months. Red shading means cost ran ahead of activity.</p></div>
-        <div class="seg" id="ov-cmp"><span class="thumb"></span><button data-v="orders" aria-pressed="true">Orders</button><button data-v="employees" aria-pressed="false">Active employees</button></div>
+        <div class="seg" id="ov-cmp"><span class="thumb"></span><button data-v="headline" aria-pressed="true" id="cmp-headline"></button><button data-v="employees" aria-pressed="false">Active employees</button></div>
       </div>
-      <div class="legend"><span><i style="background:var(--cost)"></i>Cloud cost</span><span><i style="background:var(--activity)"></i><span id="ov-cmp-name">Orders</span></span></div>
+      <div class="legend"><span><i style="background:var(--cost)"></i>Cloud cost</span><span id="ov-cmp-key"><i style="background:var(--activity)"></i><span id="ov-cmp-name"></span></span></div>
       <div class="chart tall"><canvas id="ov-index"></canvas></div>
       <p class="caption" id="ov-caption"></p>
     </article>
@@ -216,8 +245,33 @@ footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--i
         <div id="ov-split-bars" class="swap"></div>
       </article>
       <article class="panel">
-        <div class="panel-head"><div><h2>Cost per employee, by team</h2><p class="note">Each team's own app usage divided by its headcount.</p></div></div>
+        <div class="panel-head"><div><h2 id="ov-team-title"></h2><p class="note" id="ov-team-note"></p></div></div>
         <div id="ov-teams"></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Billing -->
+  <section class="page" id="page-billing" role="tabpanel" hidden>
+    <div class="intro reveal" style="--i:0">
+      <h1 class="lede" id="bi-lede"></h1>
+      <p class="sub">The bill the way the cloud provider shows it: by subscription and resource group. Pick a subscription, then open a resource group to see what it spends on.</p>
+    </div>
+    <div class="split reveal" style="--i:1">
+      <aside class="panel rail" aria-label="Subscriptions"><div class="rail-group">Subscriptions</div><div id="bi-subs" role="listbox" aria-label="Subscriptions"></div></aside>
+      <article class="panel">
+        <div class="detail-head">
+          <div><span class="chip info" id="bi-kind"></span><h2 class="detail-title" id="bi-name"></h2><p class="note" id="bi-desc"></p></div>
+          <div class="figure"><div class="big" id="bi-total"></div><div class="note" id="bi-total-label"></div></div>
+        </div>
+        <div class="panel-head" style="margin-bottom:6px">
+          <p class="note" id="bi-basis-note" style="max-width:52ch"></p>
+          <div class="seg" id="bi-basis"><span class="thumb"></span><button data-v="effective" aria-pressed="true">Effective cost</button><button data-v="billed" aria-pressed="false">Invoice amount</button></div>
+        </div>
+        <div class="chart short"><canvas id="bi-chart"></canvas></div>
+        <p class="caption" id="bi-chart-note"></p>
+        <div class="panel-head" style="margin:26px 0 4px"><div><h2>Resource groups</h2><p class="note" id="bi-rg-note"></p></div></div>
+        <div class="rgs" id="bi-rgs"></div>
       </article>
     </div>
   </section>
@@ -254,17 +308,19 @@ footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--i
     </div>
     <div class="score reveal" style="--i:1" id="an-score"></div>
     <div class="split reveal" style="--i:2">
-      <aside class="panel rail" aria-label="Planted events"><div class="rail-group">Planted events (answer key)</div><div id="an-rail" role="listbox" aria-label="Planted events"></div></aside>
+      <aside class="panel rail" aria-label="Planted events"><div class="rail-group" id="an-rail-title"></div><div id="an-rail" role="listbox" aria-label="Planted events"></div></aside>
       <article class="panel">
         <div class="summary swap" id="an-summary"></div>
         <div class="controls">
           <label>App <select id="an-app"></select></label>
           <button class="btn-link" id="an-full" type="button">Show full two years</button>
         </div>
-        <div class="legend"><span><i style="background:var(--cost)"></i>Daily cost</span><span><i class="box" style="background:var(--band)"></i>Usual range</span><span><i class="box" style="background:var(--waste)"></i>Flagged day</span></div>
+        <div class="legend"><span><i style="background:var(--cost)"></i>Daily cost</span><span><i class="dash" style="color:var(--ink-3)"></i>Expected cost</span><span><i class="dash" style="color:var(--waste)"></i>Alert line</span><span><i class="box" style="background:var(--waste-soft)"></i>Spend above the alert line</span><span><i class="box" style="background:var(--waste);border-radius:50%;width:9px;height:9px"></i>Flagged day</span></div>
         <div class="chart tall"><canvas id="an-cost"></canvas></div>
-        <div class="legend" style="margin-top:16px"><span><i style="background:var(--activity)"></i>Activity vs usual (100 = normal)</span><span><i style="background:var(--cpu)"></i>Average CPU %</span></div>
-        <div class="chart short"><canvas id="an-signals"></canvas></div>
+        <p class="caption" id="an-cost-note"></p>
+        <div id="an-signal-box"><div class="legend" style="margin-top:16px"><span><i style="background:var(--activity)"></i>Activity vs usual (100 = normal)</span><span><i style="background:var(--cpu)"></i>Average CPU %</span></div>
+        <div class="chart short"><canvas id="an-signals"></canvas></div></div>
+        <p class="empty" id="an-signal-empty" hidden>No activity or utilization data for this app, so flagged days can't be checked against usage. Add daily activity (data level 2) or utilization metrics to tell waste from growth.</p>
       </article>
     </div>
   </section>
@@ -283,6 +339,7 @@ footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--i
       </div>
       <div class="legend" id="sa-legend"></div>
       <div class="chart"><canvas id="sa-chart"></canvas></div>
+      <div id="sa-ri-summary"></div>
     </article>
   </section>
 </main>
@@ -297,9 +354,13 @@ const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // ---------- helpers ----------
 const rows = ds => { const k = Object.keys(ds), n = ds[k[0]].length; return Array.from({ length: n }, (_, i) => Object.fromEntries(k.map(c => [c, ds[c][i]]))); };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const money = v => v == null ? "-" : Math.abs(v) >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e4 ? `$${(v / 1e3).toFixed(1)}K` : `$${v.toLocaleString("en-US", { maximumFractionDigits: v < 100 ? 2 : 0, minimumFractionDigits: v < 100 ? 2 : 0 })}`;
+const CUR = D.meta.currency_symbol || "$";
+const money = v => v == null ? "-" : Math.abs(v) >= 1e6 ? `${CUR}${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e4 ? `${CUR}${(v / 1e3).toFixed(1)}K` : `${CUR}${v.toLocaleString("en-US", { maximumFractionDigits: v < 100 ? 2 : 0, minimumFractionDigits: v < 100 ? 2 : 0 })}`;
 const num = v => v == null ? "-" : Math.round(v).toLocaleString("en-US");
 const pct = (v, d = 1) => v == null ? "-" : `${v > 0 ? "+" : ""}${v.toFixed(d)}%`;
+// Cost change: up is bad (red), down is good (green). Non-cost changes (activity, CPU) stay neutral.
+const costCls = v => v == null || Math.abs(v) < 0.05 ? "" : v > 0 ? "up" : "down";
+const changeChip = (v, d = 1, prefix = "", isCost = true) => v == null ? "" : `<span class="chip ${isCost ? costCls(v) : ""}">${prefix}${pct(v, d)}</span>`;
 const toDate = s => { const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
 const monthName = (s, o = { month: "long", year: "numeric" }) => toDate(s).toLocaleString("en-US", { ...o, timeZone: "UTC" });
 const shortMonth = s => monthName(s, { month: "short", year: "2-digit" });
@@ -310,14 +371,22 @@ const KPI = rows(D.kpi), APPS = rows(D.apps), APPM = rows(D.app_monthly), TEAMS 
 const SERV = rows(D.service_monthly), TYPES = rows(D.cost_type_monthly), SPREAD = rows(D.user_spread);
 const EVENTS = rows(D.events), WASTE = rows(D.waste_monthly), RES = rows(D.reservation_monthly), FIND = rows(D.findings);
 const MONTHS = KPI.map(r => r.month), DATES = D.daily.dates;
+const BILL = rows(D.billing_monthly), RGSVC = rows(D.rg_services), RGAPP = Object.fromEntries(rows(D.rg_apps).map(r => [r.resource_group, r.app]));
 const appInfo = Object.fromEntries(APPS.map(a => [a.app_id, a]));
 const appName = id => appInfo[id]?.app_name ?? id;
 const SESSION_APPS = new Set(SPREAD.map(r => r.app_id));
-const state = { month: MONTHS[MONTHS.length - 1], page: "overview", cmp: "orders", split: "use", app: "A02", view: "trend", anApp: "A02", range: null, event: "ANM-001", saView: "waste" };
+const META = D.meta, HEAD = META.headline_label || "transactions", HEAD_SCALE = META.headline_scale || 1000;
+const HAS = { headline: KPI.some(r => r.headline_volume), employees: KPI.some(r => r.active_employees), events: EVENTS.length > 0 };
+const LATEST = MONTHS[MONTHS.length - 1], latestApps = APPM.filter(r => r.month === LATEST).sort((a, b) => b.total_cost - a.total_cost);
+const defaultApp = (latestApps.find(r => SESSION_APPS.has(r.app_id)) || latestApps[0])?.app_id;
+const cap1 = t => t.charAt(0).toUpperCase() + t.slice(1);
+const state = { month: LATEST, page: "overview", cmp: HAS.headline ? "headline" : "employees", split: "use", app: defaultApp, view: "trend",
+                anApp: defaultApp, range: null, event: null, saView: "waste", sub: "__all", rg: null, basis: "effective" };
 const charts = {};
 
 // Count a number up from its last shown value, so changes feel continuous
 function countTo(el, to, fmt) {
+  if (to == null || Number.isNaN(to)) { el.textContent = "-"; delete el.dataset.v; return; }
   const from = +(el.dataset.v ?? 0); el.dataset.v = to;
   if (REDUCED || from === to) { el.textContent = fmt(to); return; }
   const t0 = performance.now(), dur = 750;
@@ -394,14 +463,18 @@ function renderOverview(full = true) {
   // Four headline figures; lower is better for all of them
   const chip = (cur, prev) => {
     if (prev == null) return `<span class="chip">first month</span>`;
-    const d = 100 * (cur / prev - 1), cls = Math.abs(d) < 0.5 ? "" : d > 0 ? "bad" : "good";
-    return `<span class="chip ${cls}">${d > 0 ? "▲" : d < 0 ? "▼" : ""} ${Math.abs(d).toFixed(1)}%</span>`;
+    return changeChip(100 * (cur / prev - 1));
   };
   const waste = r => r.idle_cost + r.orphaned_cost + r.unused_reservation_cost;
+  $("ov-desc").textContent = META.description || "";
+  $("ov-level").innerHTML = `Data level <b>${META.data_level} of 3</b>: ${esc(META.level_name)}.` + (META.data_level < 3
+    ? ` ${META.data_level === 1 ? "Adding daily activity per app unlocks unit costs and growth checks." : "Adding user sessions unlocks cost per user and per team."}` : "");
   const kpis = [
     ["Cloud cost", k.total_cost, money, chip(k.total_cost, p?.total_cost), `${money(k.savings_vs_list)} saved vs list price`],
-    ["Per active employee", k.cost_per_active_employee, money, chip(k.cost_per_active_employee, p?.cost_per_active_employee), `${num(k.active_employees)} people used an app`],
-    ["Per 1,000 orders", k.cost_per_order * 1000, money, chip(k.cost_per_order, p?.cost_per_order), `${num(k.orders)} orders`],
+    ["Per active employee", k.cost_per_active_employee, money, HAS.employees ? chip(k.cost_per_active_employee, p?.cost_per_active_employee) : "",
+      HAS.employees ? `${num(k.active_employees)} people used an app` : "Needs user session data"],
+    [`Per ${num(HEAD_SCALE)} ${HEAD}`, k.cost_per_headline_unit == null ? null : k.cost_per_headline_unit * HEAD_SCALE, money,
+      HAS.headline ? chip(k.cost_per_headline_unit, p?.cost_per_headline_unit) : "", HAS.headline ? `${num(k.headline_volume)} ${HEAD}` : "Needs daily activity data"],
     ["Cost that served nobody", waste(k), money, chip(waste(k), p ? waste(p) : null), `${k.idle_unallocated_pct.toFixed(1)}% of the month`],
   ];
   const box = $("ov-kpis");
@@ -416,33 +489,35 @@ function renderOverview(full = true) {
 }
 
 function drawHero(i) {
-  const cmpKey = state.cmp === "orders" ? "orders" : "active_employees";
-  const avg = (key, a, b) => KPI.slice(a, b).reduce((t, r) => t + r[key], 0) / (b - a);
-  const costIdx = KPI.map(r => 100 * r.total_cost / avg("total_cost", 0, 12));
-  const cmpIdx = KPI.map(r => 100 * r[cmpKey] / avg(cmpKey, 0, 12));
-  const label = state.cmp === "orders" ? "Orders" : "Active employees";
-  $("ov-cmp-name").textContent = label;
-  draw("ov-index", {
-    type: "line",
-    data: { labels: MONTHS.map(shortMonth), datasets: [
-      { label: "Cloud cost", data: costIdx, borderColor: css("--cost"), borderWidth: 2.6, pointRadius: 0, pointHoverRadius: 4, tension: .3,
-        fill: { target: 1, above: css("--waste-soft"), below: css("--cost-soft") } },
-      { label, data: cmpIdx, borderColor: css("--activity"), borderWidth: 2.2, pointRadius: 0, pointHoverRadius: 4, tension: .3 }] },
+  const avg = (key, a, b) => KPI.slice(a, b).reduce((t, r) => t + (r[key] ?? 0), 0) / (b - a);
+  const base = Math.min(12, KPI.length), cmpOn = HAS.headline || HAS.employees;
+  const cmpKey = state.cmp === "headline" ? "headline_volume" : "active_employees";
+  const label = state.cmp === "headline" ? cap1(HEAD) : "Active employees";
+  const costIdx = KPI.map(r => 100 * r.total_cost / avg("total_cost", 0, base));
+  const sets = [{ label: "Cloud cost", data: costIdx, borderColor: css("--cost"), borderWidth: 2.6, pointRadius: 0, pointHoverRadius: 4, tension: .3,
+    fill: cmpOn ? { target: 1, above: css("--waste-soft"), below: css("--cost-soft") } : false }];
+  if (cmpOn) sets.push({ label, data: KPI.map(r => 100 * r[cmpKey] / avg(cmpKey, 0, base)), borderColor: css("--activity"), borderWidth: 2.2, pointRadius: 0, pointHoverRadius: 4, tension: .3 });
+  $("ov-cmp-name").textContent = label; $("ov-cmp-key").hidden = !cmpOn;
+  if (!cmpOn) $("ov-hero-title").textContent = "How cloud cost moved";
+  draw("ov-index", { type: "line", data: { labels: MONTHS.map(shortMonth), datasets: sets },
     options: { scales: { x: { grid: { display: false } }, y: {} },
       plugins: { marker: { index: i, color: css("--ink-3") }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(0)}` } } } }
   }, drawIn(MONTHS.length));
-  const verb = v => `${v >= 0 ? "grew" : "fell"} ${Math.abs(v).toFixed(0)}%`, yoy = key => 100 * (avg(key, 12, 24) / avg(key, 0, 12) - 1);
-  $("ov-caption").textContent = `Year over year, cloud cost ${verb(yoy("total_cost"))} while ${state.cmp === "orders" ? "orders" : "average active employees"} ${verb(yoy(cmpKey))}.`;
+  const verb = v => `${v >= 0 ? "grew" : "fell"} ${Math.abs(v).toFixed(0)}%`, yoy = key => 100 * (avg(key, base, KPI.length) / avg(key, 0, base) - 1);
+  $("ov-caption").textContent = !cmpOn ? "Add daily activity per app (data level 2) to compare cost with business volume."
+    : KPI.length < 24 ? `Cloud cost ${verb(yoy("total_cost"))} from the first year's average while ${label.toLowerCase()} ${verb(yoy(cmpKey))}.`
+    : `Year over year, cloud cost ${verb(yoy("total_cost"))} while ${state.cmp === "headline" ? HEAD : "average active employees"} ${verb(yoy(cmpKey))}.`;
 }
 
 function renderSplit() {
   const el = $("ov-split-bars"), m = state.month;
-  const labels = { user_activity: "Used by employees", owned_app: "Apps without employee logins", idle_capacity: "Idle capacity", orphaned: "Orphaned resources", unused_reservation: "Unused reservations" };
+  const labels = { user_activity: "Used by employees", owned_app: "Charged to owner teams", idle_capacity: "Idle capacity", orphaned: "Orphaned resources",
+    unused_reservation: "Unused reservations", unmapped: "Not mapped to an app", other_charges: "Taxes, credits and adjustments", shared_unspread: "Shared cost with no app to spread to" };
   if (state.split === "use") {
     const t = TYPES.filter(r => r.month === m).sort((a, b) => b.cost - a.cost), tot = t.reduce((s, r) => s + r.cost, 0);
-    $("ov-split-note").textContent = "How each dollar was attributed. Red is cost nobody used.";
-    barList(el, t.map(r => ({ label: labels[r.cost_type], value: r.cost, sub: `${(100 * r.cost / tot).toFixed(1)}%`,
-      cls: ["idle_capacity", "orphaned", "unused_reservation"].includes(r.cost_type) ? "w" : "" })));
+    $("ov-split-note").textContent = "How each dollar was attributed. Red is cost nobody used; amber still needs mapping to an app.";
+    barList(el, t.filter(r => r.cost > 0).map(r => ({ label: labels[r.cost_type] ?? r.cost_type, value: r.cost, sub: `${(100 * r.cost / tot).toFixed(1)}%`,
+      cls: ["idle_capacity", "orphaned", "unused_reservation"].includes(r.cost_type) ? "w" : r.cost_type === "unmapped" ? "u" : "" })));
   } else {
     const s = SERV.filter(r => r.month === m).sort((a, b) => b.cost - a.cost), tot = s.reduce((t, r) => t + r.cost, 0);
     $("ov-split-note").textContent = "What the money bought, by Azure service category.";
@@ -451,24 +526,30 @@ function renderSplit() {
 }
 
 function renderTeams() {
-  const t = TEAMS.filter(r => r.month === state.month && r.team !== "Unallocated" && r.user_cost_per_head != null).sort((a, b) => b.user_cost_per_head - a.user_cost_per_head);
-  barList($("ov-teams"), t.slice(0, 7).map(r => ({ label: r.team, value: r.user_cost_per_head, sub: `${num(r.headcount)} people` })));
+  const all = TEAMS.filter(r => r.month === state.month && r.team !== "Unallocated");
+  const perHead = all.filter(r => r.user_cost_per_head != null);
+  if (perHead.length) {
+    $("ov-team-title").textContent = "Cost per employee, by team"; $("ov-team-note").textContent = "Each team's own app usage divided by its headcount.";
+    barList($("ov-teams"), perHead.sort((a, b) => b.user_cost_per_head - a.user_cost_per_head).slice(0, 7).map(r => ({ label: r.team, value: r.user_cost_per_head, sub: `${num(r.headcount)} people` })));
+  } else {
+    $("ov-team-title").textContent = "Cost by team"; $("ov-team-note").textContent = "Each team's attributed cost. Add a users file with headcount to see cost per employee.";
+    barList($("ov-teams"), all.sort((a, b) => b.total_cost - a.total_cost).slice(0, 7).map(r => ({ label: r.team, value: r.total_cost })));
+  }
 }
 
 // ---------- cost to serve ----------
-const KIND = { avd: "Virtual desktops", internal_web: "Internal apps", customer: "Customer-facing", data: "Data and ML", ml: "Data and ML", devtest: "Developer" };
 function renderServe() {
   $("sv-lede").textContent = `What each app cost to run in ${monthName(state.month)}`;
   const m = APPM.filter(r => r.month === state.month);
-  const groups = [...new Set(Object.values(KIND))];
+  const groups = [...new Set(APPS.filter(a => a.role === "app").map(a => a.app_group))];
   $("sv-rail").innerHTML = groups.map(g => {
-    const items = m.filter(r => KIND[appInfo[r.app_id].app_kind] === g).sort((a, b) => b.total_cost - a.total_cost);
+    const items = m.filter(r => appInfo[r.app_id].app_group === g).sort((a, b) => b.total_cost - a.total_cost);
     if (!items.length) return "";
     return `<div class="rail-group">${g}</div>` + items.map(r => {
-      const d = r.cost_mom_pct, cls = d == null || Math.abs(d) < 1 ? "" : d > 0 ? "bad" : "good";
+      const d = r.cost_mom_pct;
       return `<button class="rail-item" role="option" data-app="${r.app_id}" aria-selected="${r.app_id === state.app}">
         <span class="name">${esc(appName(r.app_id))}</span><span class="val">${money(r.total_cost)}</span>
-        <span class="meta">${esc(appInfo[r.app_id].owner_team)}</span><span class="chip ${cls}">${pct(d)}</span></button>`;
+        <span class="meta">${esc(appInfo[r.app_id].owner_team)}</span>${changeChip(d) || `<span class="chip">-</span>`}</button>`;
     }).join("");
   }).join("");
   renderAppDetail();
@@ -477,18 +558,19 @@ function renderServe() {
 function renderAppDetail() {
   const id = state.app, info = appInfo[id], series = APPM.filter(r => r.app_id === id), cur = series.find(r => r.month === state.month);
   const perUser = SESSION_APPS.has(id), i = MONTHS.indexOf(state.month);
-  const unitKey = perUser ? "cost_per_active_user" : "cost_per_1k_transactions";
-  const unitLabel = perUser ? "per active user" : id === "A16" ? "per 1,000 pipeline runs" : "per 1,000 transactions";
-  const kindText = { avd: "Virtual desktops", internal_web: "Internal web app", customer: "Customer-facing app", data: "Data platform", ml: "Machine learning platform", devtest: "Developer environments" }[info.app_kind];
-  $("sv-kind").textContent = kindText;
+  const unitLabel = info.unit_label || "per unit";
+  const how = { sessions_by_host: "Cost is split across users by the machines they used and how heavily.",
+    sessions: "Cost is split across users by how long and how heavily they used it.",
+    owner: info.unit === "transactions" ? "Charged to its owner team and measured per unit of work." : "Charged to its owner team." }[info.effective_split];
+  $("sv-kind").textContent = info.app_group;
   $("sv-name").textContent = info.app_name;
-  $("sv-desc").textContent = `Owned by ${info.owner_team}. ${perUser ? "Cost is split across users by how long and how heavily they used it." : "No employee logins, so it's measured per unit of work."}`;
-  const hasUnit = cur?.[unitKey] != null;
-  countTo($("sv-unit"), hasUnit ? cur[unitKey] : cur?.total_cost ?? 0, money);
-  $("sv-unit-label").textContent = hasUnit ? `${unitLabel}, ${monthName(state.month, { month: "short", year: "numeric" })}` : `total, ${monthName(state.month, { month: "short", year: "numeric" })}`;
-  const stats = [["Monthly cost", money(cur?.total_cost)], ["vs last month", pct(cur?.cost_mom_pct)],
-    perUser ? ["Active users", num(cur?.active_users)] : ["Transactions", cur?.transactions ? num(cur.transactions) : "-"],
-    ["Idle", cur?.idle_cost ? money(cur.idle_cost) : "$0"]];
+  $("sv-desc").textContent = `Owned by ${info.owner_team}. ${how}`;
+  const hasUnit = cur?.unit_cost != null;
+  countTo($("sv-unit"), hasUnit ? cur.unit_cost : cur?.total_cost ?? 0, money);
+  $("sv-unit-label").textContent = `${hasUnit ? unitLabel : "total"}, ${monthName(state.month, { month: "short", year: "numeric" })}`;
+  const stats = [["Monthly cost", money(cur?.total_cost)], ["vs last month", `<span class="${costCls(cur?.cost_mom_pct)}">${pct(cur?.cost_mom_pct)}</span>`],
+    info.unit === "active_users" ? ["Active users", num(cur?.active_users)] : ["Transactions", cur?.transactions ? num(cur.transactions) : "-"],
+    ["Idle", money(cur?.idle_cost ?? 0)]];
   $("sv-stats").innerHTML = stats.map(([l, v]) => `<div>${l}<strong>${v}</strong></div>`).join("");
 
   // The spread view only exists for apps with employee sessions
@@ -500,12 +582,11 @@ function renderAppDetail() {
 
 function drawServeChart() {
   const id = state.app, series = APPM.filter(r => r.app_id === id), cur = series.find(r => r.month === state.month);
-  const perUser = SESSION_APPS.has(id), i = MONTHS.indexOf(state.month);
-  const unitKey = perUser ? "cost_per_active_user" : "cost_per_1k_transactions";
-  const unitLabel = perUser ? "Cost per active user" : "Cost per 1,000";
+  const perUser = SESSION_APPS.has(id), i = MONTHS.indexOf(state.month), info = appInfo[id];
+  const unitKey = "unit_cost", unitLabel = `Cost ${info.unit_label || "per unit"}`, hasUnit = series.some(r => r.unit_cost != null);
   const leg = $("sv-legend"), cap = $("sv-caption");
   if (state.view === "trend") {
-    leg.innerHTML = `<span><i class="box" style="background:var(--cost)"></i>Monthly cost</span><span><i style="background:var(--activity)"></i>${unitLabel}</span>`;
+    leg.innerHTML = `<span><i class="box" style="background:var(--cost)"></i>Monthly cost</span>` + (hasUnit ? `<span><i style="background:var(--activity)"></i>${unitLabel}</span>` : "");
     draw("sv-chart", {
       type: "bar",
       data: { labels: series.map(r => shortMonth(r.month)), datasets: [
@@ -514,8 +595,9 @@ function drawServeChart() {
       options: { scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => money(v) } }, y1: { position: "right", grid: { display: false }, ticks: { callback: v => money(v) } } },
         plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
     }, { duration: 800, easing: "easeOutQuart", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * 18 : 0 });
-    const first = series[0], g = cur && first[unitKey] ? 100 * (cur[unitKey] / first[unitKey] - 1) : null;
-    cap.textContent = g == null ? "Monthly cost; the selected month is highlighted." : `${unitLabel} has ${g >= 0 ? "risen" : "fallen"} ${Math.abs(g).toFixed(0)}% since October 2024. The selected month is highlighted.`;
+    const first = series.find(r => r[unitKey] != null), g = cur?.[unitKey] != null && first ? 100 * (cur[unitKey] / first[unitKey] - 1) : null;
+    cap.textContent = g == null ? (info.unit === "none" ? "Monthly cost; the selected month is highlighted." : "Monthly cost. Add activity data for this app to see its unit cost.")
+      : `${unitLabel} has ${g >= 0 ? "risen" : "fallen"} ${Math.abs(g).toFixed(0)}% since ${monthName(first.month)}. The selected month is highlighted.`;
     return;
   }
   // Spread: what a flat average hides
@@ -535,6 +617,71 @@ function drawServeChart() {
   cap.textContent = s ? `The typical user cost ${money(s.p50)}. The heaviest 10% cost over ${money(s.p90)}, the lightest 10% under ${money(s.p10)}, yet a flat average bills everyone ${money(cur.cost_per_active_user)}.` : "";
 }
 
+// ---------- billing ----------
+function renderBilling() {
+  const m = state.month, i = MONTHS.indexOf(m), prevM = MONTHS[i - 1], key = state.basis;
+  const inSub = r => state.sub === "__all" || r.subscription === state.sub;
+  const total = f => BILL.filter(f).reduce((t, r) => t + r[key], 0);
+  const chip = (cur, prev) => prev ? changeChip(100 * (cur / prev - 1)) : `<span class="chip">new</span>`;
+  const subs = [...new Set(BILL.map(r => r.subscription))].map(sb => ({ sb, cur: total(r => r.month === m && r.subscription === sb),
+    prev: prevM ? total(r => r.month === prevM && r.subscription === sb) : null, rgs: new Set(BILL.filter(r => r.subscription === sb).map(r => r.resource_group)).size }))
+    .sort((a, b) => b.cur - a.cur);
+  const all = total(r => r.month === m), allPrev = prevM ? total(r => r.month === prevM) : null;
+  $("bi-lede").textContent = `${monthName(m)} bill: ${money(all)} across ${subs.length} subscription${subs.length === 1 ? "" : "s"}`;
+  const item = (id, name, cur, prev, meta) => `<button class="rail-item" role="option" data-sub="${esc(id)}" aria-selected="${state.sub === id}">
+    <span class="name">${esc(name)}</span><span class="val">${money(cur)}</span><span class="meta">${meta}</span>${chip(cur, prev)}</button>`;
+  $("bi-subs").innerHTML = item("__all", "All subscriptions", all, allPrev, `${new Set(BILL.map(r => r.resource_group)).size} resource groups`)
+    + subs.map(x => item(x.sb, x.sb, x.cur, x.prev, `${x.rgs} resource groups`)).join("");
+
+  // Resource groups in scope, with this month vs last month
+  const rgMap = {};
+  BILL.filter(inSub).forEach(r => { const g = rgMap[r.resource_group] ??= { rg: r.resource_group, sub: r.subscription, cur: 0, prev: 0 };
+    if (r.month === m) g.cur += r[key]; if (r.month === prevM) g.prev += r[key]; });
+  const rgs = Object.values(rgMap).filter(g => Math.abs(g.cur) > 0.005 || Math.abs(g.prev) > 0.005).sort((a, b) => b.cur - a.cur);
+  const scopeTotal = rgs.reduce((t, g) => t + g.cur, 0), scopePrev = rgs.reduce((t, g) => t + g.prev, 0), max = Math.max(...rgs.map(g => g.cur), 1e-9);
+  $("bi-kind").textContent = state.sub === "__all" ? "Billing account" : "Subscription";
+  $("bi-name").textContent = state.sub === "__all" ? (META.name || "All subscriptions") : state.sub;
+  const chg = prevM && scopePrev ? 100 * (scopeTotal / scopePrev - 1) : null;
+  $("bi-desc").innerHTML = `${rgs.length} resource groups this month. ${chg != null ? `<span class="${costCls(chg)}">${pct(chg)}</span> vs ${monthName(prevM, { month: "long" })}.` : ""}`;
+  countTo($("bi-total"), scopeTotal, money);
+  $("bi-total-label").textContent = `${key === "billed" ? "invoiced" : "effective cost"}, ${monthName(m, { month: "short", year: "numeric" })}`;
+  $("bi-basis-note").textContent = key === "billed"
+    ? "Invoice amounts: reservation and other prepaid purchases appear in full in the month they were charged."
+    : "Effective cost: prepaid reservations are spread across the hours they covered, so months compare fairly.";
+  $("bi-rg-note").textContent = "Select one to see what it spends on and its monthly trend. The app shown owns most of its cost.";
+  $("bi-rgs").innerHTML = rgs.map((g, j) => `<div class="rg ${g.rg === state.rg ? "open" : ""}" data-rg="${esc(g.rg)}"><button aria-expanded="${g.rg === state.rg}">
+      <span><span class="rg-name">${esc(g.rg)}</span><span class="rg-meta">${esc(RGAPP[g.rg] ?? (g.rg.startsWith("(") ? "Reservations and other charges" : "Unmapped"))}${state.sub === "__all" ? `, ${esc(g.sub)}` : ""}</span></span>
+      <span class="track"><span class="fill" data-w="${Math.max(0.8, 100 * g.cur / max)}"></span></span>
+      <span class="amt">${money(g.cur)}</span>${chip(g.cur, g.prev)}<span class="chev" aria-hidden="true"></span></button>
+      <div class="expand"><div><div class="svc" id="bi-svc-${j}"></div></div></div></div>`).join("") || `<p class="empty">No resource groups in this subscription for ${monthName(m)}.</p>`;
+  requestAnimationFrame(() => requestAnimationFrame(() => $("bi-rgs").querySelectorAll(".fill").forEach(f => f.style.width = f.dataset.w + "%")));
+  const open = rgs.findIndex(g => g.rg === state.rg);
+  if (open >= 0) renderRgServices(open);
+  drawBillingChart();
+}
+
+function renderRgServices(j) {
+  // What the selected resource group spends on this month
+  const svc = RGSVC.filter(r => r.month === state.month && r.resource_group === state.rg).sort((a, b) => b.cost - a.cost);
+  const tot = svc.reduce((t, r) => t + r.cost, 0);
+  barList($(`bi-svc-${j}`), svc.slice(0, 6).map(r => ({ label: r.service, value: r.cost, sub: `${(100 * r.cost / tot).toFixed(0)}%` })));
+}
+
+function drawBillingChart() {
+  // Monthly trend for the open resource group, or for the selected subscription
+  const key = state.basis, i = MONTHS.indexOf(state.month);
+  const scope = state.rg ? r => r.resource_group === state.rg : r => state.sub === "__all" || r.subscription === state.sub;
+  const vals = MONTHS.map(mm => BILL.filter(r => r.month === mm && scope(r)).reduce((t, r) => t + r[key], 0));
+  $("bi-chart-note").textContent = `Monthly ${key === "billed" ? "invoice amount" : "effective cost"} for ${state.rg ?? (state.sub === "__all" ? "all subscriptions" : state.sub)}. The selected month is highlighted.`;
+  draw("bi-chart", {
+    type: "bar",
+    data: { labels: MONTHS.map(shortMonth), datasets: [{ label: state.rg ?? (state.sub === "__all" ? "All subscriptions" : state.sub), data: vals,
+      backgroundColor: vals.map((_, j) => j === i ? css("--cost") : css("--cost-soft")), borderRadius: 4 }] },
+    options: { scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => money(v) } } },
+      plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
+  }, { duration: 700, easing: "easeOutQuart", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * 15 : 0 });
+}
+
 // ---------- anomalies ----------
 const EVENT_NAMES = {
   AVD_SCALING_PLAN_DISABLED: "Finance desktops left on around the clock", GPU_LEFT_RUNNING: "GPU machines left running after training",
@@ -543,27 +690,67 @@ const EVENT_NAMES = {
   RESERVATION_EXPIRED: "E-commerce reservation expired", FESTIVE_DEMAND: "Diwali sale traffic",
   ORPHANED_RESOURCES: "Disks and IPs left by deleted VMs", DEVTEST_NO_AUTO_SHUTDOWN: "Dev VMs with no shutdown schedule",
 };
-const verdict = e => e.is_waste ? ["Waste", "bad"] : e.category === "rate_change" ? ["Price change", "info"] : ["Real growth", "good"];
+const verdict = e => e.verdict ?? (e.is_waste ? ["Waste", "bad"] : e.category === "rate_change" ? ["Price change", "info"] : ["Real growth", "good"]);
+const title = e => e.title ?? EVENT_NAMES[e.anomaly_type] ?? cap1(String(e.anomaly_type ?? "Event").toLowerCase().replaceAll("_", " "));
 
 function baseline(series) {
-  // Same weekday over the previous 6 weeks. Flagged days are replaced by their baseline so one incident
-  // doesn't widen the range for the next; after 35 flagged days in a row the new level is accepted.
+  // Same weekday over the previous 6 weeks. Flagged days are replaced by their baseline so an incident
+  // doesn't distort the days after it. Only when cost has run over 10% above expected on 80% of the last six
+  // weeks is it treated as the new normal, so a 4-week incident is never mistaken for a lasting change.
   const med = a => { const s = a.slice().sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
-  const clean = series.slice(), b = new Array(series.length).fill(null), f = new Array(series.length).fill(false);
-  let run = 0;
-  for (let t = 0; t < series.length; t++) {
+  const n = series.length, clean = series.slice(), b = new Array(n).fill(null), f = new Array(n).fill(false), ratio = new Array(n).fill(null);
+  for (let t = 0; t < n; t++) {
     const w = [];
     for (let k = 1; k <= 6; k++) { const j = t - 7 * k; if (j >= 0 && clean[j] != null) w.push(clean[j]); }
-    if (w.length < 4 || series[t] == null) { run = 0; continue; }
+    if (w.length < 4 || series[t] == null) continue;
     const m = med(w), spread = Math.max(3 * 1.4826 * med(w.map(v => Math.abs(v - m))), 0.2 * m, 1);
     b[t] = { m, hi: m + spread, lo: Math.max(0, m - spread) };
-    f[t] = series[t] > b[t].hi; run = f[t] ? run + 1 : 0;
-    if (f[t] && run <= 35) clean[t] = m;
+    f[t] = series[t] > b[t].hi;
+    ratio[t] = m > 0 ? series[t] / m : null;
+    const recent = ratio.slice(Math.max(0, t - 41), t + 1).filter(r => r != null);
+    const lasting = recent.length >= 42 && recent.filter(r => r > 1.1).length >= 0.8 * recent.length;
+    if (f[t] && !lasting) clean[t] = m;
   }
   return { b, f };
 }
 
+function detectEpisodes() {
+  // Group flagged days per app into episodes (gaps of up to 2 days allowed), rank by cost above the usual range
+  const eps = [], mean = a => { const v = a.filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+  for (const [app, a] of Object.entries(D.daily.apps)) {
+    const { b, f } = baseline(a.cost), ab = baseline(a.activity).b;
+    let t = 0;
+    while (t < f.length) {
+      if (!f[t]) { t++; continue; }
+      let e = t, gap = 0;
+      for (let k = t + 1; k < f.length && gap <= 2; k++) { if (f[k]) { e = k; gap = 0; } else gap++; }
+      const days = [...Array(e - t + 1).keys()].map(x => x + t);
+      const excess = days.reduce((s, d) => s + (f[d] ? a.cost[d] - b[d].m : 0), 0);
+      const costChg = 100 * (mean(days.map(d => a.cost[d])) / mean(days.map(d => b[d]?.m)) - 1);
+      const actIn = mean(days.map(d => a.activity[d])), actBase = mean(days.map(d => ab[d]?.m));
+      const actChg = actIn != null && actBase ? 100 * (actIn / actBase - 1) : null;
+      const cpuIn = mean(days.map(d => a.cpu[d])), cpuBefore = mean(a.cpu.slice(Math.max(0, t - 28), t));
+      const cpuChg = cpuIn != null && cpuBefore ? 100 * (cpuIn / cpuBefore - 1) : null;
+      const verdict = actChg != null && actChg > 20 ? ["Likely growth", "good"] : cpuChg != null && cpuChg < -20 ? ["Likely waste", "bad"] : ["Check", "info"];
+      eps.push({ anomaly_id: `DET-${app}-${t}`, app_id: app, start_date: DATES[t], end_date: DATES[e], win_end: DATES[e], excess, verdict,
+        title: `${appName(app)} cost ${Math.round(costChg)}% above usual`, cost_change_pct: costChg, activity_change_pct: actChg, cpu_change_pct: cpuChg,
+        description: `Cost ran ${money(excess)} above its usual range over ${e - t + 1} days.${actChg == null ? " No activity data to compare." : ""}` });
+      t = e + 1;
+    }
+  }
+  return eps.sort((x, y) => y.excess - x.excess).slice(0, 12).sort((x, y) => x.start_date.localeCompare(y.start_date));
+}
+const EV = HAS.events ? EVENTS : detectEpisodes();
+
 function renderScore() {
+  if (!HAS.events) {
+    // Without an answer key, summarise what the rule found
+    const total = EV.reduce((s, e) => s + e.excess, 0), unexplained = EV.filter(e => e.verdict[0] !== "Likely growth").length;
+    $("an-score").innerHTML = [[`${EV.length}`, "largest episodes of unusual cost, listed below"], [money(total), "spent above the usual range across them"],
+      Object.values(D.daily.apps).some(a => a.activity.some(v => v != null)) ? [`${unexplained}`, "with no matching rise in activity"]
+        : ["Level 1", "no activity data yet, so growth and waste can't be told apart"]].map(([a, b]) => `<div class="panel"><strong>${a}</strong><span>${b}</span></div>`).join("");
+    return;
+  }
   // How the simple rule scores against the answer key
   const cache = {}, hit = e => { const f = cache[e.app_id] ??= baseline(D.daily.apps[e.app_id].cost).f;
     return f.slice(DATES.indexOf(e.start_date), DATES.indexOf(e.win_end) + 1).some(Boolean); };
@@ -575,42 +762,51 @@ function renderScore() {
 }
 
 function renderAnomalyRail() {
-  $("an-rail").innerHTML = EVENTS.map(e => { const [v, cls] = verdict(e);
+  $("an-rail-title").textContent = HAS.events ? "Planted events (answer key)" : "Detected episodes";
+  $("an-rail").innerHTML = EV.length ? EV.map(e => { const [v, cls] = verdict(e);
     return `<button class="rail-item" role="option" data-event="${e.anomaly_id}" aria-selected="${e.anomaly_id === state.event}">
-      <span class="name full">${esc(EVENT_NAMES[e.anomaly_type] ?? e.anomaly_type)}</span>
-      <span class="meta">${esc(appName(e.app_id))}, ${monthName(e.start_date, { month: "short", year: "numeric" })}</span><span class="chip ${cls}">${v}</span></button>`; }).join("");
+      <span class="name full">${esc(title(e))}</span>
+      <span class="meta">${esc(appName(e.app_id))}, ${monthName(e.start_date, { month: "short", year: "numeric" })}</span><span class="chip ${cls}">${v}</span></button>`; }).join("")
+    : `<p class="empty">No days stood out from their usual range.</p>`;
 }
 
 function renderSummary() {
-  const el = $("an-summary"), e = EVENTS.find(x => x.anomaly_id === state.event);
+  const el = $("an-summary"), e = EV.find(x => x.anomaly_id === state.event);
   swap(el, () => {
-    if (!e) { el.innerHTML = `<h2>${esc(appName(state.anApp))}</h2><p class="note">Pick a planted event to zoom in on it, or scan the full period for flagged days.</p>`; return; }
-    const [v, cls] = verdict(e), c = (l, x, bad) => x == null ? "" : `<span class="chip ${bad && x > 10 ? "bad" : ""}">${l} ${pct(x, 0)}</span>`;
-    el.innerHTML = `<h2>${esc(EVENT_NAMES[e.anomaly_type])}</h2><p class="note">${esc(e.description)}</p>
+    if (!e) { el.innerHTML = `<h2>${esc(appName(state.anApp))}</h2><p class="note">Pick ${HAS.events ? "a planted event" : "an episode"} to zoom in on it, or scan the full period for flagged days.</p>`; return; }
+    const [v, cls] = verdict(e), c = (l, x, isCost = false) => changeChip(x, 0, `${l} `, isCost);
+    el.innerHTML = `<h2>${esc(title(e))}</h2><p class="note">${esc(e.description)}</p>
       <div class="chips"><span class="chip ${cls}">${v}</span>${c("Cost", e.cost_change_pct, true)}${c("Activity", e.activity_change_pct)}${c("CPU", e.cpu_change_pct)}
-      ${e.cost_change_pct == null ? `<span class="chip">No four-week baseline before this event</span>` : ""}</div>`;
+      ${e.cost_change_pct == null && HAS.events ? `<span class="chip">No four-week baseline before this event</span>` : ""}</div>`;
   });
 }
 
 function renderAnomalies() {
   const sel = $("an-app");
-  if (!sel.options.length) sel.innerHTML = APPS.map(a => `<option value="${a.app_id}">${esc(a.app_name)}</option>`).join("");
+  if (!sel.options.length) sel.innerHTML = APPS.filter(a => D.daily.apps[a.app_id]).map(a => `<option value="${a.app_id}">${esc(a.app_name)}</option>`).join("");
   sel.value = state.anApp;
   if (!$("an-rail").children.length) renderAnomalyRail();
   $("an-rail").querySelectorAll("[data-event]").forEach(b => b.setAttribute("aria-selected", b.dataset.event === state.event));
   renderSummary();
   const a = D.daily.apps[state.anApp], [s, e] = state.range ?? [0, DATES.length - 1], sl = arr => arr.slice(s, e + 1), { b, f } = baseline(a.cost);
+  const zoomed = e - s <= 150;
   const labels = sl(DATES).map(d => toDate(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "2-digit", timeZone: "UTC" }));
   draw("an-cost", {
     type: "line",
     data: { labels, datasets: [
-      { label: "Upper", data: sl(b).map(x => x?.hi ?? null), borderWidth: 0, pointRadius: 0, fill: false },
-      { label: "Lower", data: sl(b).map(x => x?.lo ?? null), borderWidth: 0, pointRadius: 0, fill: "-1", backgroundColor: css("--band") },
-      { label: "Daily cost", data: sl(a.cost), borderColor: css("--cost"), borderWidth: 1.8, pointRadius: 0, pointHoverRadius: 3 },
+      { label: "Expected cost", data: sl(b).map(x => x?.m ?? null), borderColor: css("--ink-3"), borderDash: zoomed ? [4, 4] : [], borderWidth: zoomed ? 1.4 : 1, pointRadius: 0, fill: false },
+      { label: "Alert line", data: sl(b).map(x => x?.hi ?? null), borderColor: css("--waste"), borderDash: zoomed ? [2, 3] : [], borderWidth: zoomed ? 1.4 : 1, pointRadius: 0, fill: false },
+      { label: "Daily cost", data: sl(a.cost), borderColor: css("--cost"), borderWidth: 1.8, pointRadius: 0, pointHoverRadius: 3,
+        fill: { target: 1, above: css("--waste-soft"), below: "transparent" } },
       { label: "Flagged", data: sl(a.cost).map((v, t) => f[s + t] ? v : null), showLine: false, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: css("--waste"), pointBorderWidth: 0 }] },
     options: { scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 9, autoSkip: true } }, y: { beginAtZero: true, ticks: { callback: v => money(v) } } },
-      plugins: { tooltip: { filter: c => c.datasetIndex >= 2 && c.parsed.y != null, callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
+      plugins: { tooltip: { filter: c => c.datasetIndex <= 2 && c.parsed.y != null, callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } } } }
   }, state.range ? drawIn(e - s + 1, 900) : undefined);
+  $("an-cost-note").textContent = "Expected cost is the typical cost for the same weekday over the previous six weeks, which is why it steps down at weekends. "
+    + "A day is flagged when cost rises above the alert line." + (s < 42 ? " The first six weeks have no expected line yet, because there's no history to compare with." : "");
+  const hasSignals = a.activity.some(v => v != null) || a.cpu.some(v => v != null);
+  $("an-signal-box").hidden = !hasSignals; $("an-signal-empty").hidden = hasSignals;
+  if (!hasSignals) { charts["an-signals"]?.destroy(); delete charts["an-signals"]; return; }
   const ab = baseline(a.activity).b;
   draw("an-signals", {
     type: "line",
@@ -624,7 +820,7 @@ function renderAnomalies() {
 }
 
 function zoomTo(id) {
-  const ev = EVENTS.find(x => x.anomaly_id === id), st = DATES.indexOf(ev.start_date), en = DATES.indexOf(ev.end_date ?? ev.win_end);
+  const ev = EV.find(x => x.anomaly_id === id), st = DATES.indexOf(ev.start_date), en = DATES.indexOf(ev.end_date ?? ev.win_end);
   state.event = id; state.anApp = ev.app_id;
   state.range = [Math.max(0, st - 45), Math.min(DATES.length - 1, (en < 0 ? st + 27 : en) + 45)];
 }
@@ -636,6 +832,9 @@ function renderSavings() {
   lede.innerHTML = `<span id="sa-total"></span> a month in savings found in ${monthName(latest)}`;
   countTo($("sa-total"), total, v => `$${Math.round(v).toLocaleString("en-US")}`);
   const list = $("sa-list");
+  if (!FIND.length) { lede.textContent = `No savings findings for ${monthName(latest)} yet`;
+    list.innerHTML = `<p class="empty" style="padding:8px 24px">The checks found nothing with the data provided. Adding an inventory and daily utilization metrics unlocks the idle, schedule and rightsizing checks.</p>`;
+    drawSavingsChart(); return; }
   list.innerHTML = FIND.map((r, j) => `<div class="find"><button aria-expanded="false">
       <span><span class="act">${esc(r.action)}</span><span class="scope">${esc(r.scope)}, ${r.resources} resource${r.resources === 1 ? "" : "s"}</span></span>
       <span class="track"><span class="fill g" data-w="${100 * r.monthly_savings / max}"></span></span>
@@ -649,6 +848,7 @@ function renderSavings() {
 
 function drawSavingsChart() {
   const leg = $("sa-legend");
+  $("sa-ri-summary").innerHTML = "";
   if (state.saView === "waste") {
     $("sa-chart-title").textContent = "Waste over time"; $("sa-chart-note").textContent = "Cost that served nobody: idle hosts, orphaned resources, unused reservation hours.";
     leg.innerHTML = `<span><i class="box" style="background:var(--waste)"></i>Idle capacity</span><span><i class="box" style="background:var(--activity)"></i>Orphaned resources</span><span><i class="box" style="background:var(--ink-3)"></i>Unused reservations</span>`;
@@ -663,20 +863,36 @@ function drawSavingsChart() {
     }, { duration: 800, easing: "easeOutQuart", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * 25 : 0 });
     return;
   }
-  const names = [...new Set(RES.map(r => r.reservation))], colors = [css("--cost"), css("--activity"), css("--cpu")];
-  $("sa-chart-title").textContent = "Reservation use"; $("sa-chart-note").textContent = "Share of prepaid hours actually used each month. Below 100% is money paid for nothing.";
-  leg.innerHTML = names.map((n, j) => `<span><i style="background:${colors[j]}"></i>${esc(n)}</span>`).join("");
+  // Earliest reservation first; each later line is drawn thinner on top, so lines sharing 100% stay visible
+  const names = [...new Set(RES.map(r => r.reservation))].sort((a, b) =>
+    RES.find(r => r.reservation === a).month.localeCompare(RES.find(r => r.reservation === b).month));
+  const colors = [css("--cpu"), css("--activity"), css("--cost")], widths = [7, 4, 2.2];
+  const use = r => 100 * (r.used ?? 0) / ((r.used ?? 0) + (r.unused ?? 0));
+  $("sa-chart-title").textContent = "Reservation use";
+  $("sa-chart-note").textContent = "Share of prepaid hours actually used each month. 100% means every hour paid for was used; anything below is money paid for nothing.";
+  leg.innerHTML = names.map((n, j) => `<span><i style="background:${colors[j % 3]};height:${Math.min(widths[j % 3], 5)}px"></i>${esc(n)}</span>`).join("");
   draw("sa-chart", {
     type: "line",
-    data: { labels: MONTHS.map(shortMonth), datasets: names.map((n, j) => ({ label: n, borderColor: colors[j], borderWidth: 2.2, pointRadius: 0, pointHoverRadius: 4, tension: .3,
-      data: MONTHS.map(m => { const r = RES.find(x => x.reservation === n && x.month === m); return r ? 100 * (r.used ?? 0) / ((r.used ?? 0) + (r.unused ?? 0)) : null; }) })) },
-    options: { scales: { x: { grid: { display: false } }, y: { suggestedMin: 80, max: 100.5, ticks: { callback: v => v <= 100 ? v + "%" : "" } } },
+    data: { labels: MONTHS.map(shortMonth), datasets: names.map((n, j) => ({ label: n, borderColor: colors[j % 3], borderWidth: widths[j % 3],
+      pointRadius: 0, pointHoverRadius: 4, tension: 0, clip: 10, borderCapStyle: "round", order: names.length - j,
+      data: MONTHS.map(m => { const r = RES.find(x => x.reservation === n && x.month === m); return r ? use(r) : null; }) })) },
+    options: { layout: { padding: { top: 8 } },
+      scales: { x: { grid: { display: false } }, y: { suggestedMin: 80, max: 100, ticks: { stepSize: 5, callback: v => v + "%" } } },
       plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(1)}% used` } } } }
   }, drawIn(MONTHS.length, 900));
+
+  // One line per reservation: when it ran, how well it was used, and what the unused hours cost
+  const last = MONTHS[MONTHS.length - 1];
+  $("sa-ri-summary").innerHTML = `<table class="ri-table"><thead><tr><th>Reservation</th><th>Active</th><th class="num">Average use</th><th class="num">Paid for nothing</th></tr></thead><tbody>${
+    names.map((n, j) => { const rs = RES.filter(r => r.reservation === n), first = rs[0].month, end = rs[rs.length - 1].month;
+      const avg = rs.reduce((t, r) => t + use(r), 0) / rs.length, wasted = rs.reduce((t, r) => t + (r.unused_cost ?? 0), 0);
+      const status = end === last ? "now" : `${monthName(end, { month: "short", year: "numeric" })} (expired)`;
+      return `<tr><td><i style="background:${colors[j % 3]}"></i>${esc(n)}</td><td>${monthName(first, { month: "short", year: "numeric" })} to ${status}</td>
+        <td class="num">${avg.toFixed(1)}%</td><td class="num">${money(wasted)}</td></tr>`; }).join("")}</tbody></table>`;
 }
 
 // ---------- routing ----------
-const RENDER = { overview: () => renderOverview(true), serve: renderServe, anomalies: renderAnomalies, savings: renderSavings };
+const RENDER = { overview: () => renderOverview(true), billing: renderBilling, serve: renderServe, anomalies: renderAnomalies, savings: renderSavings };
 function moveInk() {
   const b = document.querySelector('nav.tabs button[aria-selected="true"]'), ink = document.querySelector(".tab-ink");
   ink.style.width = b.offsetWidth + "px"; ink.style.transform = `translateX(${b.offsetLeft}px)`;
@@ -687,7 +903,7 @@ function show(page) {
   document.querySelectorAll(".page").forEach(p => { const on = p.id === `page-${state.page}`; p.hidden = !on; p.classList.remove("entering"); });
   const cur = $(`page-${state.page}`); void cur.offsetWidth; cur.classList.add("entering");
   // Month only drives Overview and Cost to serve; other pages say what period they cover instead
-  const usesMonth = ["overview", "serve"].includes(state.page);
+  const usesMonth = ["overview", "billing", "serve"].includes(state.page);
   $("month-pick").hidden = !usesMonth; $("scope-note").hidden = usesMonth;
   $("scope-note").textContent = state.page === "anomalies" ? "Daily, all 24 months" : `Latest month: ${monthName(MONTHS[MONTHS.length - 1])}`;
   if (location.hash.slice(1) !== state.page) history.replaceState(null, "", `#${state.page}`);
@@ -698,13 +914,21 @@ function show(page) {
 const monthSel = $("month");
 monthSel.innerHTML = MONTHS.slice().reverse().map(m => `<option value="${m}">${monthName(m)}</option>`).join("");
 monthSel.value = state.month;
-monthSel.addEventListener("change", () => { state.month = monthSel.value; state.page === "overview" ? renderOverview(false) : renderServe(); });
+monthSel.addEventListener("change", () => { state.month = monthSel.value; state.page === "overview" ? renderOverview(false) : RENDER[state.page](); });
 document.querySelector("nav.tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.page); });
 
 seg("ov-cmp", state.cmp, v => { state.cmp = v; drawHero(MONTHS.indexOf(state.month)); });
 seg("ov-split", state.split, v => { state.split = v; swap($("ov-split-bars"), renderSplit); });
 seg("sv-view", state.view, v => { state.view = v; drawServeChart(); });
 seg("sa-view", state.saView, v => { state.saView = v; drawSavingsChart(); });
+seg("bi-basis", state.basis, v => { state.basis = v; renderBilling(); });
+$("bi-subs").addEventListener("click", e => { const b = e.target.closest("[data-sub]"); if (!b) return; state.sub = b.dataset.sub; state.rg = null; renderBilling(); });
+$("bi-rgs").addEventListener("click", e => { const b = e.target.closest(".rg > button"); if (!b) return;
+  const row = b.parentElement, opening = !row.classList.contains("open");
+  $("bi-rgs").querySelectorAll(".rg.open").forEach(r => { r.classList.remove("open"); r.querySelector("button").setAttribute("aria-expanded", false); });
+  state.rg = opening ? row.dataset.rg : null;
+  if (opening) { row.classList.add("open"); b.setAttribute("aria-expanded", true); renderRgServices([...$("bi-rgs").children].indexOf(row)); }
+  drawBillingChart(); });
 
 $("sv-rail").addEventListener("click", e => { const b = e.target.closest("[data-app]"); if (!b) return;
   state.app = b.dataset.app; $("sv-rail").querySelectorAll("[data-app]").forEach(x => x.setAttribute("aria-selected", x === b)); renderAppDetail(); });
@@ -719,8 +943,15 @@ window.addEventListener("hashchange", () => show(location.hash.slice(1)));
 window.addEventListener("resize", () => { moveInk(); placeThumbs(); });
 document.fonts?.ready.then(() => { moveInk(); placeThumbs(); });
 
-$("foot").textContent = `Synthetic data for a fictional company, generated by cloud-impact-analyzer. Costs in USD, FOCUS 1.0 format. Built ${D.meta.built}.`;
-zoomTo("ANM-001");
+$("org-name").textContent = META.name; document.title = `Cloud cost to impact - ${META.name}`;
+$("cmp-headline").textContent = cap1(HEAD);
+if (!HAS.headline) $("cmp-headline").remove();
+if (!HAS.employees) $("ov-cmp").querySelector('[data-v="employees"]').remove();
+if (!HAS.headline && !HAS.employees) $("ov-cmp").remove();
+$("foot").textContent = `${META.footer || ""} Built ${META.built}.`.trim();
+// Open the anomaly chart on the first waste event in the answer key, or the biggest detected episode
+const firstEv = HAS.events ? EV.find(e => e.is_waste && e.category === "spike") : [...EV].sort((x, y) => y.excess - x.excess)[0];
+if (firstEv) zoomTo(firstEv.anomaly_id); else state.anApp = Object.keys(D.daily.apps)[0];
 renderScore();
 show(location.hash.slice(1) || "overview");
 </script>

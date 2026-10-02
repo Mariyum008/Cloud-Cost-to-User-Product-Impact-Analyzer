@@ -1,0 +1,2 @@
+date,resource_id,running_hours,avg_cpu_pct
+2026-09-01,/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.compute/virtualmachines/vm-shop-01,24,31.5

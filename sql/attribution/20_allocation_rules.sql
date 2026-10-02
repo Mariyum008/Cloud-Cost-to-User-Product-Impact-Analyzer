@@ -1,16 +1,20 @@
--- Step 2: the written-down rules, so every split in the engine is explainable.
+-- Step 2: the rules behind every split, written out with this run's settings so results are explainable.
 CREATE OR REPLACE TABLE allocation_rules AS
-SELECT * FROM (VALUES
-    ('R1', 'AVD host VMs', 'host-day', 'session_hours x cpu_share_pct of sessions on that host that day',
-     'Heavier, longer sessions pay more of the host they ran on. Host-days with no sessions become idle cost.'),
-    ('R2', 'Other app cost (web, data, ML, AVD disks and profiles)', 'app-month',
-     'session_hours x cpu_share_pct of all the app''s sessions that month',
-     'Always-on cost is split over the month so a lone weekend user does not absorb a whole day. Months with cost but no sessions become idle cost.'),
-    ('R3', 'Shared platform (Backup & DR, networking, logging, Key Vault)', 'day',
-     'each app''s share of that day''s direct cost',
-     'Proportional allocation: bigger apps lean on shared services more. Then split to users by R2.'),
-    ('R4', 'Customer-facing apps, ETL, Dev/Test', 'app', 'owner team (no employee sessions)',
-     'Charged to the owning team; unit cost is measured per transaction or pipeline run instead of per user.'),
-    ('R5', 'Orphaned disks/IPs and unused reservation hours', 'resource-day', 'not allocated',
-     'Kept visible as waste instead of being hidden inside other teams'' costs.')
-) AS t(rule_id, applies_to, grain, driver, rationale);
+WITH s AS (SELECT
+    (SELECT value FROM cfg_settings WHERE key = 'session_weight') AS weight,
+    (SELECT value FROM cfg_settings WHERE key = 'shared_split') AS shared)
+SELECT * FROM (
+    SELECT 'R1' AS rule_id, 'Apps split by host (desktops, VMs users log into)' AS applies_to, 'host-day' AS grain,
+           'session ' || replace(s.weight, '_x_', ' x ') || ' on that host that day' AS driver,
+           'Users pay for the machine they actually used. Host-days with no sessions become idle cost.' AS rationale FROM s
+    UNION ALL SELECT 'R2', 'Apps split by sessions, and non-host cost of R1 apps', 'app-month',
+           'session ' || replace(s.weight, '_x_', ' x ') || ' across the app''s sessions that month',
+           'Always-on cost is split over the month so a lone weekend user does not absorb a whole day.' FROM s
+    UNION ALL SELECT 'R3', 'Shared platform apps', 'day',
+           CASE s.shared WHEN 'even' THEN 'equal share per app with cost that day' ELSE 'each app''s share of that day''s direct cost' END,
+           'Platform services exist for every app. The resulting slice then flows to users through R2.' FROM s
+    UNION ALL SELECT 'R4', 'Apps split by owner, or session apps without session data', 'app',
+           'owner team', 'Charged to the owning team; unit cost is measured per transaction instead of per person.' FROM s
+    UNION ALL SELECT 'R5', 'Orphaned, unused reservation, unmapped and other charges', 'resource-day',
+           'not allocated', 'Kept visible instead of being hidden inside other teams'' costs.' FROM s
+);

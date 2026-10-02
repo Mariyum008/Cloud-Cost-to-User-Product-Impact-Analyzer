@@ -1,4 +1,5 @@
-data/synthetic/
+data/*
+!data/reference/
 reports/
 __pycache__/
 *.pyc
